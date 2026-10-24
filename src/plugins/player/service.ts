@@ -7,6 +7,7 @@ import { isTempId, isEmpty } from './utils'
 import { exitApp } from '@/core/common'
 import { getCurrentTrackId } from './playList'
 import { pause, play, playNext, playPrev } from '@/core/player/player'
+import { syncPlayState } from './stateSync'
 
 let isInitialized = false
 
@@ -77,7 +78,13 @@ const registerPlaybackService = async() => {
   })
 
   TrackPlayer.addEventListener(TPEvent.PlaybackState, async info => {
-    if (global.lx.gettingUrlId || isTempId()) return
+    if (global.lx.gettingUrlId || isTempId()) {
+      // 「正在取播放链接」「正在播放占位音轨」期间的状态不代表最终状态，这里照旧忽略。
+      // 但 Playing 事件一旦落在这个窗口里被丢掉，UI 就会永远停在暂停态
+      // （唱片不转、进度和时间都不走），所以丢事件时补一次状态校正兜底。
+      if (info.state == TPState.Playing) syncPlayState(500)
+      return
+    }
     // let currentIsPlaying = false
 
     switch (info.state) {

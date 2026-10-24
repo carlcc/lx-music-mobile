@@ -19,8 +19,12 @@ export const clearListInfo: typeof searchSonglistActions.clearListInfo = (source
 
 export const search = async(text: string, page: number, sourceId: Source): Promise<ListInfoItem[]> => {
   const listInfo = searchSonglistState.listInfos[sourceId]!
-  // if (!text) return []
+  // 空关键词不发起请求（避免界面重建过程中用未初始化的搜索信息打一次无意义的网络请求）
+  if (!text) return []
   const key = `${page}__${sourceId}__${text}`
+  // 所有音源都记录最后一次搜索的词，便于界面重建时直接从缓存恢复、不再发起网络请求
+  setSearchText(text)
+  setSource(sourceId)
   if (listInfo.key == key && listInfo.list.length) return listInfo.list
   if (sourceId == 'all') {
     listInfo.key = key
@@ -39,8 +43,6 @@ export const search = async(text: string, page: number, sourceId: Source): Promi
     }
     return Promise.all(task).then((results: SearchResult[]) => {
       if (key != listInfo.key) return []
-      setSearchText(text)
-      setSource(sourceId)
       return setListInfo(results, page, text)
     })
   } else {

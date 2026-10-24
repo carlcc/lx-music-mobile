@@ -8,6 +8,7 @@ import { createStyle } from '@/utils/tools'
 import { useTheme } from '@/store/theme/hook'
 import Text from './Text'
 import { scaleSizeH, scaleSizeW } from '@/utils/pixelRatio'
+import { CAR } from '@/components/car/constants'
 
 const menuItemHeight = scaleSizeH(40)
 const menuItemWidth = scaleSizeW(100)
@@ -28,9 +29,10 @@ const styles = createStyle({
   },
   menu: {
     position: 'absolute',
-    // borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'lightgray',
-    borderRadius: 2,
+    // 圆角与车机卡片保持一致（内容需要一起裁剪，否则高亮/按下态还是直角）
+    borderRadius: CAR.radius,
+    overflow: 'hidden',
     backgroundColor: 'white',
     elevation: 3,
   },
@@ -127,7 +129,10 @@ const Menu = ({
   // console.log(menuStyle)
   // console.log(menuItemStyle)
   return (
-    <View style={{ ...styles.menu, ...menuStyle, backgroundColor: theme['c-content-background'] }} onStartShouldSetResponder={() => true}>
+    <View
+      style={{ ...styles.menu, ...menuStyle, backgroundColor: theme['c-content-background'], borderWidth: 1, borderColor: theme['c-border-background'] }}
+      onStartShouldSetResponder={() => true}
+    >
       <Animated.ScrollView keyboardShouldPersistTaps={'always'}>
         {
           menus.map((menu, index) => (

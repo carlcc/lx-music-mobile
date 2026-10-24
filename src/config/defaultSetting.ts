@@ -11,7 +11,7 @@ const defaultSetting: LX.AppSetting = {
   'common.homePageScroll': true,
   'common.allowProgressBarSeek': true,
   'common.showBackBtn': false,
-  'common.showExitBtn': true,
+  'common.showExitBtn': false,
   'common.useSystemFileSelector': true,
   'common.alwaysKeepStatusbarHeight': false,
 
@@ -58,8 +58,8 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.lyricPlayedColor': 'rgba(7, 197, 86, 1)',
   'desktopLyric.style.lyricShadowColor': 'rgba(0, 0, 0, 0.6)',
 
-  'search.isShowHotSearch': false,
-  'search.isShowHistorySearch': false,
+  'search.isShowHotSearch': true,
+  'search.isShowHistorySearch': true,
 
   'list.isClickPlayList': false,
   'list.isShowSource': true,
@@ -71,6 +71,22 @@ const defaultSetting: LX.AppSetting = {
   'download.fileName': '歌名 - 歌手',
 
   'sync.enable': false,
+
+  'car.bgBlur': true,
+  'car.bgGlass': true,
+  'car.imgCacheDays': 7,
+  'car.auditionCache': true,
+  // 留空表示使用默认目录（外部存储/Music/lxcache）
+  'car.auditionCacheDir': '',
+  'car.bgBlurRadius': 18,
+  'car.bgDim': 0.45,
+  /** 内容层底纹不透明度：在承载文字的内容层再铺一层主题底色，保证任意背景图下文字都清晰（0 = 只用背景遮罩） */
+  'car.contentScrim': 0.6,
+  'car.bgSource': 'cover',
+  'car.vinyl': true,
+  'car.startupView': 'nav_love',
+  'car.fontScale': 1,
+  'car.autoAddDefaultList': 'default',
 
   // 'theme.id': 'blue_plus',
   'theme.id': 'green',

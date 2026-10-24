@@ -1,43 +1,31 @@
-import { memo, useRef } from 'react'
+import { memo } from 'react'
 
 import { View, StyleSheet, TouchableOpacity } from 'react-native'
 
 import { Icon } from '@/components/common/Icon'
-import { pop } from '@/navigation'
-import { useTheme } from '@/store/theme/hook'
 import { usePlayerMusicInfo } from '@/store/player/hook'
 import Text from '@/components/common/Text'
 import { scaleSizeH } from '@/utils/pixelRatio'
 import { HEADER_HEIGHT as _HEADER_HEIGHT, NAV_SHEAR_NATIVE_IDS } from '@/config/constant'
-import commonState from '@/store/common/state'
-import CommentBtn from './CommentBtn'
-import Btn from './Btn'
-import SettingPopup, { type SettingPopupType } from '../../components/SettingPopup'
-import DesktopLyricBtn from './DesktopLyricBtn'
+import { setPlayDetailVisible } from '@/components/car/playDetailState'
 
 export const HEADER_HEIGHT = scaleSizeH(_HEADER_HEIGHT)
 
 const Title = () => {
-  const theme = useTheme()
   const musicInfo = usePlayerMusicInfo()
-
 
   return (
     <View style={styles.titleContent}>
       <Text numberOfLines={1} style={styles.title} size={14}>{musicInfo.name}</Text>
-      <Text numberOfLines={1} style={styles.title} size={12} color={theme['c-font-label']}>{musicInfo.singer}</Text>
+      <Text numberOfLines={1} style={styles.title} size={12}>{musicInfo.singer}</Text>
     </View>
   )
 }
 
 export default memo(() => {
-  const popupRef = useRef<SettingPopupType>(null)
-
+  // 车机：播放页是常驻浮层，返回 = 收起浮层（不再是 pop 掉一个已 push 的屏幕）
   const back = () => {
-    void pop(commonState.componentIds.playDetail!)
-  }
-  const showSetting = () => {
-    popupRef.current?.show()
+    setPlayDetailVisible(false)
   }
 
   return (
@@ -47,11 +35,7 @@ export default memo(() => {
           <Icon name="chevron-left" size={18} />
         </TouchableOpacity>
         <Title />
-        <DesktopLyricBtn />
-        <CommentBtn />
-        <Btn icon="slider" onPress={showSetting} />
       </View>
-      <SettingPopup ref={popupRef} position="left" direction="horizontal" />
     </View>
   )
 })
@@ -60,9 +44,7 @@ export default memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 0,
-    // backgroundColor: '#ccc',
     flexDirection: 'row',
-    // justifyContent: 'center',
     height: '100%',
   },
   button: {
@@ -73,15 +55,7 @@ const styles = StyleSheet.create({
   },
   titleContent: {
     flex: 1,
-    // alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    // flex: 1,
-    // textAlign: 'center',
-  },
-  icon: {
-    paddingLeft: 4,
-    paddingRight: 4,
-  },
+  title: {},
 })

@@ -59,6 +59,9 @@ const Pic = ({ componentId, playCount, imgUrl }: {
 
 export interface HeaderProps {
   componentId: string
+  /** 车机内嵌详情：封面与按钮由固定头部渲染，这里隐藏避免重复 */
+  hidePic?: boolean
+  hideActionBar?: boolean
 }
 
 export interface HeaderType {
@@ -71,7 +74,7 @@ export interface DetailInfo {
   imgUrl?: string
 }
 
-export default forwardRef<HeaderType, HeaderProps>(({ componentId }: { componentId: string }, ref) => {
+export default forwardRef<HeaderType, HeaderProps>(({ componentId, hidePic = false, hideActionBar = false }: HeaderProps, ref) => {
   const statusBarHeight = useStatusbarHeight()
   const theme = useTheme()
   const info = useListInfo()
@@ -86,7 +89,7 @@ export default forwardRef<HeaderType, HeaderProps>(({ componentId }: { component
   return (
     <View style={{ ...styles.container, paddingTop: statusBarHeight, borderBottomColor: theme['c-border-background'] }}>
       <View style={{ flexDirection: 'row', flexGrow: 0, flexShrink: 0, padding: 10 }}>
-        <Pic componentId={componentId} playCount={detailInfo.playCount} imgUrl={detailInfo.imgUrl} />
+        { hidePic ? null : <Pic componentId={componentId} playCount={detailInfo.playCount} imgUrl={detailInfo.imgUrl} /> }
         <View style={{ flexDirection: 'column', flexGrow: 1, flexShrink: 1, paddingLeft: 5 }} nativeID={NAV_SHEAR_NATIVE_IDS.songlistDetail_title}>
           <Text size={14} numberOfLines={ 1 }>{detailInfo.name}</Text>
           <View style={{ flexGrow: 0, flexShrink: 1 }}>
@@ -94,7 +97,7 @@ export default forwardRef<HeaderType, HeaderProps>(({ componentId }: { component
           </View>
         </View>
       </View>
-      <ButtonBar />
+      { hideActionBar ? null : <ButtonBar /> }
       {/* <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={{ flexGrow: 0, flexShrink: 1, paddingTop: 5, paddingRight: 5 }}>
               <Text style={{ fontSize: 12, color: AppColors.normal20 }} numberOfLines={ 1 }>{playCount || '-'}</Text>

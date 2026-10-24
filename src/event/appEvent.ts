@@ -158,6 +158,11 @@ export class AppEvent extends Event {
     this.emit('musicInfoUpdate', musicInfo)
   }
 
+  // 试听缓存改变事件（新增/删除缓存、重新扫描）
+  auditionCacheChanged() {
+    this.emit('auditionCacheChanged')
+  }
+
   changeMenuVisible(visible: boolean) {
     this.emit('changeMenuVisible', visible)
   }

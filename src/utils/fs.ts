@@ -8,6 +8,7 @@ import {
   type HashAlgorithm,
   getExternalStoragePaths as _getExternalStoragePaths,
 } from 'react-native-file-system'
+import { addTraffic } from '@/core/trafficStat'
 
 export type {
   FileType,
@@ -64,6 +65,17 @@ export const downloadFile = (url: string, path: string, options: Omit<RNFS.Downl
     options.headers = {
       'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Pixel 3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.79 Mobile Safari/537.36',
     }
+  }
+  // 流量统计：按已写入字节的增量累计下行流量（中断时不会多算）
+  const userProgress = options.progress
+  let written = 0
+  options.progress = (res) => {
+    const bytesWritten = typeof res.bytesWritten == 'number' ? res.bytesWritten : 0
+    if (bytesWritten > written) {
+      addTraffic(bytesWritten - written, 0)
+      written = bytesWritten
+    }
+    userProgress?.(res)
   }
   return RNFS.downloadFile({
     fromUrl: url, // URL to download file from

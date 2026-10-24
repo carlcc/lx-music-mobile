@@ -2,6 +2,7 @@ import songlistState, { type TagInfo, type ListDetailInfo, type ListInfo } from 
 import songlistActions from '@/store/songlist/action'
 import { deduplicationList, toNewMusicInfo } from '@/utils'
 import musicSdk from '@/utils/musicSdk'
+import { getData, saveData } from '@/plugins/storage'
 
 
 interface DetailPageCache { data: ListDetailInfo, sourcePage: number }
@@ -10,6 +11,27 @@ type CacheValue = LimitDetailCache | ListInfo
 
 const cache = new Map<string, CacheValue>()
 const LIST_LOAD_LIMIT = 30
+
+/** 在线歌单的本地拷贝：内存 cache 只在进程内有效，这份会落盘，下次进入可以立即渲染 */
+interface OnlineListSnapshot {
+  list: LX.Music.MusicInfoOnline[]
+  maxPage: number
+  time: number
+}
+
+const snapshotKey = (source: LX.OnlineSource, id: string) => `@online_list_snapshot__${source}__${id}`
+
+/** 读取在线歌单的本地拷贝，没有则返回 null */
+export const getOnlineListSnapshot = async(source: LX.OnlineSource, id: string): Promise<OnlineListSnapshot | null> => {
+  return (await getData<OnlineListSnapshot>(snapshotKey(source, id)).catch(() => null)) ?? null
+}
+
+/** 把在线歌单的歌曲拷贝一份到本地 */
+export const saveOnlineListSnapshot = async(source: LX.OnlineSource, id: string, list: LX.Music.MusicInfoOnline[], maxPage: number): Promise<void> => {
+  if (!list.length) return
+  const snapshot: OnlineListSnapshot = { list, maxPage, time: Date.now() }
+  await saveData(snapshotKey(source, id), snapshot).catch(() => {})
+}
 
 
 /**

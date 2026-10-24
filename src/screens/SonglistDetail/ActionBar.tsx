@@ -11,6 +11,8 @@ import { handleCollect, handlePlay } from './listAction'
 import songlistState from '@/store/songlist/state'
 import { useI18n } from '@/lang'
 import { useListInfo } from './state'
+import { appendToQueue } from '@/components/car/action'
+import { useHorizontalMode } from '@/utils/hooks'
 // import { NAV_SHEAR_NATIVE_IDS } from '@/config/constant'
 
 export default memo(() => {
@@ -32,6 +34,14 @@ export default memo(() => {
     void handleCollect(info.id, info.source, songlistState.listDetailInfo.info.name || info.name)
   }
 
+  // 车机：把当前歌单追加到播放队列末尾
+  const handleAppendQueue = () => {
+    const list = songlistState.listDetailInfo.list
+    if (!list.length) return
+    void appendToQueue(list)
+  }
+  const isHorizontalMode = useHorizontalMode()
+
   return (
     <View style={styles.container}>
       <Button onPress={handleCollection} style={styles.controlBtn}>
@@ -40,6 +50,15 @@ export default memo(() => {
       <Button onPress={handlePlayAll} style={styles.controlBtn}>
         <Text style={{ ...styles.controlBtnText, color: theme['c-button-font'] }}>{t('play_all')}</Text>
       </Button>
+      {
+        isHorizontalMode
+          ? (
+            <Button onPress={handleAppendQueue} style={styles.controlBtn}>
+              <Text style={{ ...styles.controlBtnText, color: theme['c-button-font'] }}>追加到队列</Text>
+            </Button>
+            )
+          : null
+      }
       <Button onPress={back} style={styles.controlBtn}>
         <Text style={{ ...styles.controlBtnText, color: theme['c-button-font'] }}>{t('back')}</Text>
       </Button>

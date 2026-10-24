@@ -2,7 +2,10 @@ import hotSearchState, { type Source } from '@/store/hotSearch/state'
 import hotSearchActions, { type Lists } from '@/store/hotSearch/action'
 import musicSdk from '@/utils/musicSdk'
 
-export const getList = async(source: Source): Promise<string[]> => {
+/** 正在进行的请求，避免同一音源被并发调用时重复发请求 */
+const pendingTasks = new Map<Source, Promise<string[]>>()
+
+const loadList = async(source: Source): Promise<string[]> => {
   if (source == 'all') {
     let task = []
     for (const source of hotSearchState.sources) {
@@ -33,4 +36,15 @@ export const getList = async(source: Source): Promise<string[]> => {
   }
 }
 
-
+export const getList = async(source: Source): Promise<string[]> => {
+  // 已有数据直接复用
+  if (source != 'all' && hotSearchState.sourceList[source]?.length) return Promise.resolve(hotSearchState.sourceList[source])
+  const cachedTask = pendingTasks.get(source)
+  if (cachedTask) return cachedTask
+  const task = loadList(source)
+  pendingTasks.set(source, task)
+  void task.catch(() => {}).finally(() => {
+    pendingTasks.delete(source)
+  })
+  return task
+}

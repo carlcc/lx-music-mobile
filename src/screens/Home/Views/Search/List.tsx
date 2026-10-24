@@ -5,6 +5,8 @@ import type { Source as SongListSource } from '@/store/search/songlist/state'
 import MusicList, { type MusicListType } from './MusicList'
 import BlankView, { type BlankViewType } from './BlankView'
 import SonglistList from './SonglistList'
+import searchState from '@/store/search/state'
+import { useHorizontalMode } from '@/utils/hooks'
 
 interface ListProps {
   onSearch: (keyword: string) => void
@@ -15,7 +17,9 @@ export interface ListType {
 
 export default forwardRef<ListType, ListProps>(({ onSearch }, ref) => {
   const [listType, setListType] = useState<SearchState['searchType']>('music')
-  const [showBlankView, setShowListView] = useState(true)
+  // 界面重建（切换导航 tab）时如果有上次的搜索词，直接进结果页，避免先闪一下空白页
+  const [showBlankView, setShowListView] = useState(!searchState.searchText)
+  const isHorizontal = useHorizontalMode()
   const listRef = useRef<MusicListType>(null)
   const blankViewRef = useRef<BlankViewType>(null)
 
@@ -39,7 +43,8 @@ export default forwardRef<ListType, ListProps>(({ onSearch }, ref) => {
 
   return (
     showBlankView
-      ? <BlankView ref={blankViewRef} onSearch={onSearch} />
+      // 车机横屏：历史搜索 / 热门搜索统一放在搜索框下方的浮层里（见 CarSearchHeader），这里不再重复显示
+      ? (isHorizontal ? null : <BlankView ref={blankViewRef} onSearch={onSearch} />)
       : listType == 'songlist'
         ? <SonglistList ref={listRef} />
         : <MusicList ref={listRef} />

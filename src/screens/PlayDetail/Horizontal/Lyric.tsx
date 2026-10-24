@@ -6,11 +6,12 @@ import { createStyle } from '@/utils/tools'
 // import { useComponentIds } from '@/store/common/hook'
 import { useTheme } from '@/store/theme/hook'
 import { useSettingValue } from '@/store/setting/hook'
-import { AnimatedColorText } from '@/components/common/Text'
+import Text, { AnimatedColorText } from '@/components/common/Text'
 import { setSpText } from '@/utils/pixelRatio'
 import playerState from '@/store/player/state'
 import { scrollTo } from '@/utils/scroll'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
+import { useStatusText } from '@/store/player/hook'
 // import { screenkeepAwake } from '@/utils/nativeModules/utils'
 // import { log } from '@/utils/log'
 // import { toast } from '@/utils/tools'
@@ -37,9 +38,9 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
       theme['c-primary-alpha-200'],
       1,
     ] as const : [
-      theme['c-350'],
-      theme['c-300'],
-      0.6,
+      theme['c-font'],
+      theme['c-font'],
+      0.65,
     ] as const
   }, [activeLine, lineNum, theme])
 
@@ -75,6 +76,7 @@ const LrcLine = memo(({ line, lineNum, activeLine, onLayout }: LineProps) => {
 const wait = async() => new Promise(resolve => setTimeout(resolve, 100))
 
 export default () => {
+  const theme = useTheme()
   const lyricLines = useLrcSet()
   const { line } = useLrcPlay()
   const flatListRef = useRef<FlatList>(null)
@@ -88,6 +90,7 @@ export default () => {
   const listLayoutInfoRef = useRef<{ spaceHeight: number, lineHeights: number[] }>({ spaceHeight: 0, lineHeights: [] })
   const scrollCancelRef = useRef<(() => void) | null>(null)
   const isShowLyricProgressSetting = useSettingValue('playDetail.isShowLyricProgressSetting')
+  const statusText = useStatusText()
   // useLock()
   // const [imgUrl, setImgUrl] = useState(null)
   // const theme = useGetter('common', 'theme')
@@ -268,6 +271,13 @@ export default () => {
     <View style={styles.space} onLayout={handleSpaceLayout}></View>
   ), [handleSpaceLayout])
 
+  // 没有歌词（含歌曲/歌词获取失败）时给出提示，避免一片空白
+  const emptyTip = useMemo(() => {
+    if (lyricLines.length) return ''
+    if (!playerState.playMusicInfo.musicInfo?.id) return '未播放歌曲'
+    return statusText || '暂无歌词 · 可尝试切换音源或稍后重试'
+  }, [lyricLines.length, statusText])
+
   return (
     <>
       <FlatList
@@ -286,6 +296,15 @@ export default () => {
         onScrollToIndexFailed={handleScrollToIndexFailed}
         onScroll={handleScroll}
       />
+      {
+        emptyTip
+          ? (
+            <View style={styles.emptyMask} pointerEvents="box-none">
+              <Text size={14} color={theme['c-font']}>{emptyTip}</Text>
+            </View>
+            )
+          : null
+      }
       { isShowLyricProgressSetting ? <PlayLine ref={playLineRef} onPlayLine={handlePlayLine} /> : null }
     </>
   )
@@ -300,6 +319,13 @@ const styles = createStyle({
   },
   space: {
     paddingTop: '100%',
+  },
+  emptyMask: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '38%',
+    alignItems: 'center',
   },
   line: {
     paddingTop: 10,

@@ -12,7 +12,7 @@ import Text from '@/components/common/Text'
 import { useI18n } from '@/lang'
 import { useVersionDownloadProgressUpdated, useVersionInfo, useVersionInfoIgnoreVersionUpdated } from '@/store/version/hook'
 import ModalContent from './ModalContent'
-import { checkUpdate, downloadUpdate, hideModal, setIgnoreVersion } from '@/core/version'
+import { downloadUpdate, hideModal, setIgnoreVersion } from '@/core/version'
 
 const VersionItem = ({ version, desc }: VersionInfo) => {
   return (
@@ -164,9 +164,8 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
   }
 
   const handleConfirm = () => {
-    if (versionInfo.isLatest || versionInfo.isUnknown) {
-      void checkUpdate()
-    } else if (versionInfo.status == 'downloaded') {
+    // 不再提供"重新检查更新"（不再请求版本信息接口）
+    if (versionInfo.status == 'downloaded') {
       void updateApp()
     } else if (versionInfo.status == 'idle' || versionInfo.status == 'error') {
       downloadUpdate()

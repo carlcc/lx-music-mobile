@@ -1,206 +1,226 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { log } from '@/utils/log'
+import { PermissionsAndroid } from 'react-native'
+import { Dirs, FileSystem } from 'react-native-file-system'
 
+/**
+ * App 数据存储：直接写到**外部存储**，这样卸载/重装 App 数据不会丢
+ * （歌单、歌曲缓存索引、不喜欢列表、设置、播放信息等）
+ *
+ * 目录：`<外部存储>/lxmusic/data/<key>.json`，一个 key 一个文件。
+ * 只有在拿不到存储权限时才回退到应用私有目录（此时卸载会丢，会提示用户）。
+ *
+ * 说明：本项目的 targetSdkVersion = 29 且声明了 requestLegacyExternalStorage，
+ * 因此可以直接按文件路径读写外部存储。
+ * （若以后 targetSdk 升到 30+，这里必须改成 SAF/MediaStore。）
+ */
+
+const EXTERNAL_DIR = `${Dirs.SDCardDir}/lxmusic/data`
+const PRIVATE_DIR = `${Dirs.DocumentDir}/lxmusic_data`
+const MIGRATE_FLAG_FILE = '.migrated_from_async_storage'
+
+// 1.4.0 之前 AsyncStorage 里有分片存储的值，迁移时需要还原
 const partKeyPrefix = '@___PART___'
 const partKeyArrPrefix = '@___PART_A___'
-const partKeyPrefixRxp = /^@___PART___/
-const partKeyArrPrefixRxp = /^@___PART_A___/
-const keySplit = ','
-const limit = 500000
 
-const buildData = (key: string, value: any, datas: Array<[string, string]>) => {
-  let valueStr = JSON.stringify(value)
-  if (valueStr.length <= limit) {
-    datas.push([key, valueStr])
-    return
+let dataDir = EXTERNAL_DIR
+let isInited = false
+
+export const getStorageDir = () => dataDir
+/** 当前是否在使用外部存储（false 表示已回退到应用私有目录） */
+export const isExternalStorage = () => dataDir == EXTERNAL_DIR
+
+const checkPermission = async() => {
+  try {
+    return await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
+  } catch {
+    return false
   }
+}
 
-  const partKeys = []
-  for (let i = 0, len = Math.floor(valueStr.length / limit); i <= len; i++) {
-    let partKey = `${partKeyArrPrefix}${key}${i}`
-    partKeys.push(partKey)
-    datas.push([partKey, valueStr.substring(i * limit, (i + 1) * limit)])
+const requestPermission = async() => {
+  try {
+    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
+    return result === PermissionsAndroid.RESULTS.GRANTED
+  } catch {
+    return false
   }
-  datas.push([key, partKeyArrPrefix + JSON.stringify(partKeys)])
 }
 
-// 1.4.0 之前的数据分片存储方式，存在key的内容与分隔符冲突的问题
-// 1.4.0 开始改用数组存储，不再使用分隔符的方式
-const handleGetDataOld = async<T>(partKeys: string): Promise<T> => {
-  const keys = partKeys.replace(partKeyPrefixRxp, '').split(keySplit)
-
-  return AsyncStorage.multiGet(keys).then(datas => {
-    return JSON.parse(datas.map(data => data[1]).join(''))
-  })
+const ensureDir = async(path: string) => {
+  try {
+    if (await FileSystem.exists(path)) return true
+    await FileSystem.mkdir(path)
+    return true
+  } catch (err) {
+    console.warn('storage mkdir failed:', path, err)
+    return false
+  }
 }
 
-const handleGetData = async<T>(partKeys: string): Promise<T> => {
-  if (partKeys.startsWith(partKeyPrefix)) return handleGetDataOld<T>(partKeys)
+// 只转义文件系统不允许的字符（@ 本身是合法的，不需要转义）
+const UNSAFE_FILE_CHARS_RE = /[\\/:*?"<>|]/g
+const HEX_CODE_RE = /%([0-9A-Fa-f]{2})/g
 
-  const keys = JSON.parse(partKeys.replace(partKeyArrPrefixRxp, '')) as string[]
-  return AsyncStorage.multiGet(keys).then(datas => {
-    return JSON.parse(datas.map(data => data[1]).join(''))
-  })
+const encodeKey = (key: string) => key.replace(UNSAFE_FILE_CHARS_RE, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+const decodeKey = (fileName: string) => fileName.replace(HEX_CODE_RE, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+
+const fileNameOf = (key: string) => `${encodeKey(key)}.json`
+const filePathOf = (key: string) => `${dataDir}/${fileNameOf(key)}`
+
+/**
+ * 早期版本用 encodeURIComponent 做文件名，key 里的 "@" 被转义成 "%40"，
+ * 导致所有文件都以 %40 开头。这里把历史文件名统一成新规则，
+ * 避免同一份数据同时存在新旧两个文件。
+ */
+const normalizeFileNames = async() => {
+  try {
+    const files = await FileSystem.ls(dataDir)
+    for (const file of files) {
+      const name = typeof file == 'string' ? file : String(file)
+      if (!name.endsWith('.json')) continue
+      const newName = fileNameOf(decodeKey(name.slice(0, -'.json'.length)))
+      if (newName == name) continue
+      await FileSystem.mv(`${dataDir}/${name}`, `${dataDir}/${newName}`).catch(() => {})
+    }
+  } catch (err) {
+    console.warn('storage normalize file names failed:', err)
+  }
 }
+
+// ============ 初始化（必须在任何读写之前调用） ============
+
+/** 申请存储权限并确定数据目录；首次使用还会把 AsyncStorage 里的旧数据迁移过来 */
+export const initStorage = async() => {
+  if (isInited) return
+  isInited = true
+
+  let granted = await checkPermission()
+  if (!granted) granted = await requestPermission()
+  if (!granted) granted = await checkPermission() // 部分机型首次请求会被系统直接吞掉
+
+  dataDir = granted ? EXTERNAL_DIR : PRIVATE_DIR
+  await ensureDir(dataDir)
+
+  await normalizeFileNames()
+  await migrateFromAsyncStorage()
+
+  if (!granted) {
+    void import('@/utils/tools').then(m => {
+      m.toast('未获得存储权限，数据将保存在应用私有目录，卸载 App 会丢失', 'long')
+    })
+  }
+}
+
+const parseAsyncValue = async(value: string): Promise<unknown> => {
+  if (value.startsWith(partKeyPrefix)) {
+    const keys = value.replace(partKeyPrefix, '').split(',')
+    const datas = await AsyncStorage.multiGet(keys)
+    return JSON.parse(datas.map(data => data[1] ?? '').join(''))
+  }
+  if (value.startsWith(partKeyArrPrefix)) {
+    const keys = JSON.parse(value.replace(partKeyArrPrefix, '')) as string[]
+    const datas = await AsyncStorage.multiGet(keys)
+    return JSON.parse(datas.map(data => data[1] ?? '').join(''))
+  }
+  return JSON.parse(value)
+}
+
+/** 一次性迁移：把 AsyncStorage 里已有的数据搬到新的文件存储 */
+const migrateFromAsyncStorage = async() => {
+  try {
+    if (await FileSystem.exists(`${dataDir}/${MIGRATE_FLAG_FILE}`)) return
+    const keys = await AsyncStorage.getAllKeys()
+    if (keys.length) {
+      const datas = await AsyncStorage.multiGet(keys)
+      for (const [key, value] of datas) {
+        if (value == null) continue
+        try {
+          const parsed = await parseAsyncValue(value)
+          if (parsed == null) continue
+          await saveData(key, parsed)
+        } catch (err) {
+          console.warn('storage migrate failed:', key, err)
+        }
+      }
+    }
+    await FileSystem.writeFile(`${dataDir}/${MIGRATE_FLAG_FILE}`, String(Date.now()))
+  } catch (err) {
+    console.warn('storage migrate failed:', err)
+  }
+}
+
+// ============ 读写接口（与原 AsyncStorage 版本保持一致） ============
 
 export const saveData = async(key: string, value: any) => {
-  const datas: Array<[string, string]> = []
-  buildData(key, value, datas)
-
+  await ensureDir(dataDir)
   try {
-    await removeData(key)
-    await AsyncStorage.multiSet(datas)
-  } catch (e: any) {
-    // saving error
-    log.error('storage error[saveData]:', key, e.message)
-    throw e
+    await FileSystem.writeFile(filePathOf(key), JSON.stringify(value))
+  } catch (err) {
+    console.error('storage error[saveData]:', key, err)
+    throw err
   }
 }
 
 export const getData = async<T = unknown>(key: string): Promise<T | null> => {
-  let value: string | null
+  const path = filePathOf(key)
   try {
-    value = await AsyncStorage.getItem(key)
-  } catch (e: any) {
-    // error reading value
-    log.error('storage error[getData]:', key, e.message)
-    throw e
+    if (!(await FileSystem.exists(path))) return null
+    const value = await FileSystem.readFile(path)
+    if (!value) return null
+    return JSON.parse(value) as T
+  } catch (err) {
+    // 文件损坏时按"没有数据"处理，避免整个初始化挂掉
+    console.warn('storage error[getData]:', key, err)
+    return null
   }
-  if (value && (partKeyPrefixRxp.test(value) || partKeyArrPrefixRxp.test(value))) {
-    return handleGetData<T>(value)
-  } else if (value == null) return value
-  return JSON.parse(value)
 }
 
 export const removeData = async(key: string) => {
-  let value: string | null
   try {
-    value = await AsyncStorage.getItem(key)
-  } catch (e: any) {
-    // error reading value
-    log.error('storage error[removeData]:', key, e.message)
-    throw e
-  }
-  if (value) {
-    if (partKeyPrefixRxp.test(value)) {
-      let partKeys = value.replace(partKeyPrefixRxp, '').split(keySplit)
-      partKeys.push(key)
-      try {
-        await AsyncStorage.multiRemove(partKeys)
-      } catch (e: any) {
-        // remove error
-        log.error('storage error[removeData]:', key, e.message)
-        throw e
-      }
-      return
-    } else if (partKeyArrPrefixRxp.test(value)) {
-      let partKeys = JSON.parse(value.replace(partKeyArrPrefixRxp, '')) as string[]
-      partKeys.push(key)
-      try {
-        await AsyncStorage.multiRemove(partKeys)
-      } catch (e: any) {
-        // remove error
-        log.error('storage error[removeData]:', key, e.message)
-        throw e
-      }
-      return
-    }
-  }
-
-  try {
-    await AsyncStorage.removeItem(key)
-  } catch (e: any) {
-    // remove error
-    log.error('storage error[removeData]:', key, e.message)
-    throw e
+    if (!(await FileSystem.exists(filePathOf(key)))) return
+    await FileSystem.unlink(filePathOf(key))
+  } catch (err) {
+    console.warn('storage error[removeData]:', key, err)
   }
 }
 
 export const getAllKeys = async() => {
-  let keys
   try {
-    keys = await AsyncStorage.getAllKeys()
-  } catch (e: any) {
-    // read key error
-    log.error('storage error[getAllKeys]:', e.message)
-    throw e
+    const files = await FileSystem.ls(dataDir)
+    const keys: string[] = []
+    for (const file of files) {
+      const name = typeof file == 'string' ? file : String(file)
+      if (!name.endsWith('.json')) continue
+      const key = decodeKey(name.slice(0, -'.json'.length))
+      if (key) keys.push(key)
+    }
+    return keys
+  } catch (err) {
+    console.warn('storage error[getAllKeys]:', err)
+    return []
   }
-
-  return keys
 }
 
-
 export const getDataMultiple = async<T extends readonly string[]>(keys: T) => {
-  type RawData = { [K in keyof T]: [T[K], string | null] }
-  let datas: RawData
-  try {
-    datas = await AsyncStorage.multiGet(keys) as RawData
-  } catch (e: any) {
-    // read error
-    log.error('storage error[getDataMultiple]:', e.message)
-    throw e
-  }
-  const promises: Array<Promise<ReadonlyArray<[unknown | null]>>> = []
-  for (const [, value] of datas) {
-    if (value && (partKeyPrefixRxp.test(value) || partKeyArrPrefixRxp.test(value))) {
-      promises.push(handleGetData(value))
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      promises.push(Promise.resolve(value ? JSON.parse(value) : value))
-    }
-  }
-  return Promise.all(promises).then(values => {
-    return datas.map(([key], index) => ([key, values[index]])) as { [K in keyof T]: [T[K], unknown] }
-  })
+  const values = await Promise.all(keys.map(async key => await getData(key)))
+  return keys.map((key, index) => ([key, values[index]])) as { [K in keyof T]: [T[K], unknown] }
 }
 
 export const saveDataMultiple = async(datas: Array<[string, any]>) => {
-  const allData: Array<[string, string]> = []
-  for (const [key, value] of datas) {
-    buildData(key, value, allData)
-  }
-  try {
-    await removeDataMultiple(datas.map(k => k[0]))
-    await AsyncStorage.multiSet(allData)
-  } catch (e: any) {
-    // save error
-    log.error('storage error[saveDataMultiple]:', e.message)
-    throw e
-  }
+  await ensureDir(dataDir)
+  await Promise.all(datas.map(async([key, value]) => {
+    await saveData(key, value)
+  }))
 }
-
 
 export const removeDataMultiple = async(keys: string[]) => {
   if (!keys.length) return
-  const datas = await AsyncStorage.multiGet(keys)
-  let allKeys = []
-  for (const [key, value] of datas) {
-    allKeys.push(key)
-    if (value) {
-      if (partKeyPrefixRxp.test(value)) {
-        allKeys.push(...value.replace(partKeyPrefixRxp, '').split(keySplit))
-      } else if (partKeyArrPrefixRxp.test(value)) {
-        allKeys.push(...JSON.parse(value.replace(partKeyArrPrefixRxp, '')) as string[])
-      }
-    }
-  }
-  try {
-    await AsyncStorage.multiRemove(allKeys)
-  } catch (e: any) {
-    // remove error
-    log.error('storage error[removeDataMultiple]:', e.message)
-    throw e
-  }
+  await Promise.all(keys.map(async key => {
+    await removeData(key)
+  }))
 }
 
 export const clearAll = async() => {
-  try {
-    await AsyncStorage.clear()
-  } catch (e: any) {
-    // clear error
-    log.error('storage error[clearAll]:', e.message)
-    throw e
-  }
+  const keys = await getAllKeys()
+  await removeDataMultiple(keys)
 }
-
-export { useAsyncStorage } from '@react-native-async-storage/async-storage'

@@ -1,5 +1,7 @@
 import { memo, useRef } from 'react'
 import { View, TouchableOpacity } from 'react-native'
+import { useHorizontalMode } from '@/utils/hooks'
+import CarSongRowActions from '@/components/car/SongRowActions'
 // import Button from '@/components/common/Button'
 import Text from '@/components/common/Text'
 import Badge, { type BadgeType } from '@/components/common/Badge'
@@ -9,8 +11,19 @@ import { useTheme } from '@/store/theme/hook'
 import { scaleSizeH } from '@/utils/pixelRatio'
 import { LIST_ITEM_HEIGHT } from '@/config/constant'
 import { createStyle, type RowInfo } from '@/utils/tools'
+import { useCarMetrics } from '@/components/car/constants'
 
 export const ITEM_HEIGHT = scaleSizeH(LIST_ITEM_HEIGHT)
+
+/**
+ * 条目高度：车机横屏按屏幕高度收一点（高 dpi 小屏上原值会占掉太多竖向空间），
+ * 一屏能显示更多条目；竖屏保持原值
+ */
+export const useListItemHeight = () => {
+  const isHorizontalMode = useHorizontalMode()
+  const { onlineItemHeight } = useCarMetrics()
+  return isHorizontalMode ? Math.min(ITEM_HEIGHT, onlineItemHeight) : ITEM_HEIGHT
+}
 
 const useQualityTag = (musicInfo: LX.Music.MusicInfoOnline) => {
   const t = useI18n()
@@ -29,7 +42,7 @@ const useQualityTag = (musicInfo: LX.Music.MusicInfoOnline) => {
   return info
 }
 
-export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu, selectedList, rowInfo, isShowAlbumName, isShowInterval }: {
+export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu, selectedList, rowInfo, isShowAlbumName, isShowInterval, showAddToPlaylist }: {
   item: LX.Music.MusicInfoOnline
   index: number
   showSource?: boolean
@@ -40,45 +53,61 @@ export default memo(({ item, index, showSource, onPress, onLongPress, onShowMenu
   rowInfo: RowInfo
   isShowAlbumName: boolean
   isShowInterval: boolean
+  showAddToPlaylist?: boolean
 }) => {
   const theme = useTheme()
+  const isHorizontalMode = useHorizontalMode()
 
   const isSelected = selectedList.includes(item)
 
   const moreButtonRef = useRef<TouchableOpacity>(null)
+  const carActionsRef = useRef<View>(null)
   const handleShowMenu = () => {
-    if (moreButtonRef.current?.measure) {
-      moreButtonRef.current.measure((fx, fy, width, height, px, py) => {
+    // 车机横屏下没有独立的"更多"按钮，用动作组容器作为菜单位置锚点
+    const node = moreButtonRef.current ?? carActionsRef.current
+    if (node?.measure) {
+      node.measure((fx, fy, width, height, px, py) => {
         // console.log(fx, fy, width, height, px, py)
         onShowMenu(item, index, { x: Math.ceil(px), y: Math.ceil(py), w: Math.ceil(width), h: Math.ceil(height) })
       })
     }
   }
   const tagInfo = useQualityTag(item)
+  const itemHeight = useListItemHeight()
 
   const singer = `${item.singer}${isShowAlbumName && item.meta.albumName ? ` · ${item.meta.albumName}` : ''}`
+  // 车机横屏：使用主题语义色（c-font），不再用固定灰阶，保证各主题下的对比度
+  const labelColor = theme['c-font-label']
+  const snColor = theme['c-font-label']
+  const intervalColor = theme['c-font-label']
 
   return (
-    <View style={{ ...styles.listItem, width: rowInfo.rowWidth, height: ITEM_HEIGHT, backgroundColor: isSelected ? theme['c-primary-background-hover'] : 'rgba(0,0,0,0)' }}>
+    <View style={{ ...styles.listItem, width: rowInfo.rowWidth, height: itemHeight, backgroundColor: isSelected ? theme['c-primary-background-hover'] : 'rgba(0,0,0,0)' }}>
       <TouchableOpacity style={styles.listItemLeft} onPress={() => { onPress(item, index) }} onLongPress={() => { onLongPress(item, index) }}>
-        <Text style={styles.sn} size={13} color={theme['c-300']}>{index + 1}</Text>
+        <Text style={styles.sn} size={13} color={snColor}>{index + 1}</Text>
         <View style={styles.itemInfo}>
           <Text numberOfLines={1}>{item.name}</Text>
           <View style={styles.listItemSingle}>
             { tagInfo.type ? <Badge type={tagInfo.type}>{tagInfo.text}</Badge> : null }
             { showSource ? <Badge type="tertiary">{item.source}</Badge> : null }
-            <Text style={styles.listItemSingleText} size={11} color={theme['c-500']} numberOfLines={1}>{singer}</Text>
+            <Text style={styles.listItemSingleText} size={11} color={labelColor} numberOfLines={1}>{singer}</Text>
           </View>
         </View>
         {
           isShowInterval ? (
-            <Text size={12} color={theme['c-250']} numberOfLines={1}>{item.interval}</Text>
+            <Text style={styles.interval} size={12} color={intervalColor} numberOfLines={1}>{item.interval}</Text>
           ) : null
         }
       </TouchableOpacity>
-     <TouchableOpacity onPress={handleShowMenu} ref={moreButtonRef} style={styles.moreButton}>
-        <Icon name="dots-vertical" style={{ color: theme['c-350'] }} size={12} />
-      </TouchableOpacity>
+      {
+        isHorizontalMode
+          ? <View ref={carActionsRef} collapsable={false}><CarSongRowActions musicInfo={item} onMore={handleShowMenu} showAdd={showAddToPlaylist} /></View>
+          : (
+            <TouchableOpacity onPress={handleShowMenu} ref={moreButtonRef} style={styles.moreButton}>
+              <Icon name="dots-vertical" style={{ color: theme['c-font-label'] }} size={12} />
+            </TouchableOpacity>
+            )
+      }
     </View>
   )
 }, (prevProps, nextProps) => {
@@ -114,6 +143,10 @@ const styles = createStyle({
     // backgroundColor: 'rgba(0,0,0,0.2)',
     paddingLeft: 3,
     paddingRight: 3,
+  },
+  // 时长与右侧操作按钮之间留白
+  interval: {
+    marginRight: 16,
   },
   itemInfo: {
     flexGrow: 1,

@@ -75,7 +75,9 @@ export const buildActiveThemeColors = (theme: LX.Theme): LX.ActiveTheme => {
     ...theme.config.themeColors,
     ...theme.config.extInfo,
     'c-font': theme.config.themeColors['c-850'],
-    'c-font-label': theme.config.themeColors['c-450'],
+    // 次要文字：不能取太靠近背景的中间灰（c-450 在浅色主题上只有约 2.8:1 对比度，几乎看不清），
+    // 取 c-650：浅色主题约 5:1、深色主题约 6:1，两种明暗下都够清晰，同时仍明显弱于正文 c-850
+    'c-font-label': theme.config.themeColors['c-650'],
     'c-primary-font': theme.config.themeColors['c-primary'],
     'c-primary-font-hover': theme.config.themeColors['c-primary-alpha-300'],
     'c-primary-font-active': theme.config.themeColors['c-primary-dark-100-alpha-200'],

@@ -4,6 +4,7 @@ import { defaultUrl } from '@/config'
 // import { action as playerAction } from '@/store/modules/player'
 import settingState from '@/store/setting/state'
 import playerState from '@/store/player/state'
+import { syncPlayState } from './stateSync'
 
 
 const list: LX.Player.Track[] = []
@@ -182,6 +183,11 @@ const handlePlayMusic = async(musicInfo: LX.Player.PlayMusic, url: string, time:
   if (queue.length > 2) {
     void TrackPlayer.remove(Array(queue.length - 2).fill(null).map((_, i) => i)).then(() => list.splice(0, list.length - 2))
   }
+
+  // 上面的 pause / seek / play 都是跨端异步调用，原生状态事件（尤其是 Playing）
+  // 有可能因为 service 里的 gettingUrl / 临时音轨守卫而被丢掉，
+  // 这里主动按原生真实状态校正一次，避免 UI 停在暂停态（唱片不转、进度不走）
+  syncPlayState()
 }
 let playPromise = Promise.resolve()
 let actionId = Math.random()

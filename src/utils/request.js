@@ -4,6 +4,7 @@ import BackgroundTimer from 'react-native-background-timer'
 import { requestMsg } from './message'
 import { bHh } from './musicSdk/options'
 import { deflateRaw } from 'pako'
+import { addTraffic } from '@/core/trafficStat'
 
 const defaultHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36',
@@ -166,6 +167,27 @@ const blobToBuffer = (blob) => {
   })
 }
 
+/**
+ * 请求体大小（字节），拿不到的类型返回 0
+ * @param {*} body
+ */
+const getBodySize = body => {
+  if (!body) return 0
+  if (typeof body == 'string') return body.length
+  if (typeof body.byteLength == 'number') return body.byteLength
+  return 0
+}
+
+/**
+ * 响应体大小（字节）：优先用 content-length（传输字节数），没有再按内容估算
+ */
+const getRespSize = (resp, text, binary) => {
+  const contentLength = Number(resp.headers?.map?.['content-length'] || 0)
+  if (contentLength) return contentLength
+  if (binary) return text?.size ?? 0
+  return typeof text == 'string' ? text.length : 0
+}
+
 const fetchData = (url, { timeout = 15000, ...options }) => {
   console.log('---start---', url)
 
@@ -177,10 +199,12 @@ const fetchData = (url, { timeout = 15000, ...options }) => {
 
   return {
     request: handleRequestData(url, options).then(options => {
+      addTraffic(0, getBodySize(options.body))
       return global.fetch(url, {
         ...options,
         signal: controller.signal,
       }).then(resp => (options.binary ? resp.blob() : resp.text()).then(text => {
+        addTraffic(getRespSize(resp, text, options.binary), 0)
         // console.log(options, headers, text)
         return {
           headers: resp.headers.map,

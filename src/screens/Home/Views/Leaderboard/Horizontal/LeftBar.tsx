@@ -1,82 +1,109 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react'
-import { View } from 'react-native'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react'
+import { ScrollView, TouchableOpacity, View } from 'react-native'
 
-import SourceSelector, {
-  type SourceSelectorType as _SourceSelectorType,
-  // type SourceSelectorProps as _SourceSelectorProps,
-} from '@/components/SourceSelector'
-import BoardsList, { type BoardsListType, type BoardsListProps } from '../BoardsList'
-import { BorderWidths } from '@/theme'
 import { createStyle } from '@/utils/tools'
-import { handleCollect, handlePlay } from '../listAction'
-import boardState, { type InitState } from '@/store/leaderboard/state'
+import Text from '@/components/common/Text'
 import { useTheme } from '@/store/theme/hook'
+import { useSourceNames } from '@/store/common/hook'
+import boardState, { type BoardItem } from '@/store/leaderboard/state'
 import { getBoardsList } from '@/core/leaderboard'
-
-type Sources = Readonly<InitState['sources']>
-// type SourceSelectorProps = _SourceSelectorProps<Sources>
-type SourceSelectorType = _SourceSelectorType<Sources>
+import { carFontSize, useCarFontScale, useCarMetrics } from '@/components/car/constants'
 
 export interface LeftBarProps {
-  onChangeList: (source: LX.OnlineSource, id: string) => void
+  onChangeList: (source: LX.OnlineSource, id: string, name?: string) => void
 }
 
 export interface LeftBarType {
   setBound: (source: LX.OnlineSource, id: string) => void
 }
 
+/**
+ * 车机排行榜左列：顶部固定音源选择器，下面只显示该音源的榜单
+ * 注：BoardItem 只有 id / name / bangid，因此不显示封面、更新时间、Top3
+ */
 export default forwardRef<LeftBarType, LeftBarProps>(({ onChangeList }, ref) => {
   const theme = useTheme()
-  const sourceSelectorRef = useRef<SourceSelectorType>(null)
-  const boardsListRef = useRef<BoardsListType>(null)
-  const boundInfo = useRef<{ source: LX.OnlineSource, id: string | null }>({ source: 'kw', id: null })
+  const fontScale = useCarFontScale()
+  const sourceNames = useSourceNames()
+  const { rowHeight } = useCarMetrics()
+  // 榜单名是单行文本，行高可以比歌曲列表更紧凑
+  const itemHeight = Math.max(34, rowHeight - 18)
+  const [source, setSource] = useState<LX.OnlineSource>(boardState.sources[0] ?? 'kw')
+  const [list, setList] = useState<BoardItem[]>([])
+  const [selectedId, setSelectedId] = useState<string>('')
+
+  const loadList = useCallback((targetSource: LX.OnlineSource, selectId?: string) => {
+    void getBoardsList(targetSource).then(boards => {
+      setList(boards ?? [])
+      if (selectId) {
+        setSelectedId(selectId)
+        return
+      }
+      const id = boards?.[0]?.id ?? ''
+      setSelectedId(id)
+      if (id) onChangeList(targetSource, id, boards[0].name)
+    }).catch(() => {})
+  }, [onChangeList])
+
+  useEffect(() => {
+    loadList(source)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useImperativeHandle(ref, () => ({
-    setBound(source, listId) {
-      boundInfo.current = { source, id: listId }
-      sourceSelectorRef.current?.setSourceList(boardState.sources, source)
-      void getBoardsList(source).then(list => {
-        boardsListRef.current?.setList(list, listId)
-      })
+    setBound(targetSource, id) {
+      setSource(targetSource)
+      loadList(targetSource, id)
     },
-  }), [])
+  }), [loadList])
 
+  const handleSourceChange = (targetSource: LX.OnlineSource) => {
+    if (targetSource == source) return
+    setSource(targetSource)
+    loadList(targetSource)
+  }
 
-  const onSourceChange = (source: LX.OnlineSource) => {
-    boundInfo.current.source = source
-    void getBoardsList(source).then(list => {
-      const id = list[0].id
-      requestAnimationFrame(() => {
-        boardsListRef.current?.setList(list, id)
-        requestAnimationFrame(() => {
-          onChangeList(source, id)
-        })
-      })
-    })
-  }
-  const onBoundChange: BoardsListProps['onBoundChange'] = (id) => {
-    boundInfo.current.id = id
-    onChangeList(boundInfo.current.source, id)
-  }
-  const onPlay: BoardsListProps['onPlay'] = (id) => {
-    boundInfo.current.id = id
-    void handlePlay(id, boardState.listDetailInfo.list)
-  }
-  const onCollect: BoardsListProps['onCollect'] = (id, name) => {
-    boundInfo.current.id = id
-    void handleCollect(id, name, boundInfo.current.source)
+  const handlePress = (id: string, name: string) => {
+    setSelectedId(id)
+    onChangeList(source, id, name)
   }
 
   return (
-    <View style={{ ...styles.container, borderRightColor: theme['c-list-header-border-bottom'] }}>
-      <View style={styles.selector}>
-        <SourceSelector ref={sourceSelectorRef} onSourceChange={onSourceChange} />
-      </View>
-      <BoardsList
-        ref={boardsListRef}
-        onBoundChange={onBoundChange}
-        onPlay={onPlay}
-        onCollect={onCollect}
-      />
+    <View style={styles.container}>
+      <ScrollView style={styles.sources} horizontal showsHorizontalScrollIndicator={false}>
+        {boardState.sources.map(item => (
+          <TouchableOpacity
+            key={item}
+            style={{
+              ...styles.source,
+              ...(item == source ? { ...styles.sourceActive, borderColor: theme['c-primary-font'] } : null),
+            }}
+            activeOpacity={0.6}
+            onPress={() => { handleSourceChange(item) }}
+          >
+            <Text size={carFontSize(12.5, fontScale)} color={item == source ? theme['c-primary-font'] : theme['c-font']} numberOfLines={1}>{sourceNames[item] ?? item}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <ScrollView style={styles.list}>
+        {list.map(item => {
+          const active = selectedId == item.id
+          return (
+            <TouchableOpacity
+              key={item.id}
+              style={{
+                ...styles.item,
+                height: itemHeight,
+                backgroundColor: active ? theme['c-primary-background-hover'] : 'rgba(0,0,0,0)',
+              }}
+              activeOpacity={0.6}
+              onPress={() => { handlePress(item.id, item.name) }}
+            >
+              <Text size={carFontSize(14, fontScale)} color={active ? theme['c-primary-font'] : theme['c-font']} numberOfLines={1}>{item.name}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
     </View>
   )
 })
@@ -84,15 +111,37 @@ export default forwardRef<LeftBarType, LeftBarProps>(({ onChangeList }, ref) => 
 const styles = createStyle({
   container: {
     flexDirection: 'column',
-    width: '26%',
-    maxWidth: 180,
-    minWidth: 110,
+    flex: 1,
+  },
+  sources: {
     flexGrow: 0,
     flexShrink: 0,
-    borderRightWidth: BorderWidths.normal,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
-  selector: {
+  source: {
     height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'rgba(127, 127, 127, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  sourceActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  list: {
+    flex: 1,
+    paddingTop: 4,
+    paddingBottom: 10,
+  },
+  item: {
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginHorizontal: 6,
+    justifyContent: 'center',
   },
 })
-

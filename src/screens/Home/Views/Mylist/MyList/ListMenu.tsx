@@ -26,6 +26,7 @@ export interface ListMenuProps {
   onImport: (listInfo: LX.List.MyListInfo, index: number) => void
   onExport: (listInfo: LX.List.MyListInfo, index: number) => void
   onSync: (listInfo: LX.List.UserListInfo) => void
+  onCacheAll: (listInfo: LX.List.MyListInfo) => void
   onSelectLocalFile: (listInfo: LX.List.MyListInfo, index: number) => void
   onRemove: (listInfo: LX.List.UserListInfo) => void
 }
@@ -45,6 +46,7 @@ export default forwardRef<ListMenuType, ListMenuProps>(({
   onImport,
   onExport,
   onSync,
+  onCacheAll,
   onSelectLocalFile,
   onRemove,
 }, ref) => {
@@ -93,6 +95,7 @@ export default forwardRef<ListMenuType, ListMenuProps>(({
       { action: 'duplicateMusic', label: t('lists__duplicate') },
       { action: 'local_file', disabled: !local_file, label: t('list_select_local_file') },
       { action: 'sync', disabled: !sync || !local_file, label: t('list_sync') },
+      { action: 'cacheAll', disabled: !local_file, label: t('list_cache_all') },
       { action: 'import', label: t('list_import') },
       { action: 'export', label: t('list_export') },
       // { action: 'changePosition', label: t('change_position') },
@@ -123,6 +126,9 @@ export default forwardRef<ListMenuType, ListMenuProps>(({
         break
       case 'sync':
         onSync(selectInfo.listInfo as LX.List.UserListInfo)
+        break
+      case 'cacheAll':
+        onCacheAll(selectInfo.listInfo)
         break
         // case 'changePosition':
 

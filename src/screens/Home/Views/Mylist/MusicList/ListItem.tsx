@@ -5,6 +5,7 @@ import { LIST_ITEM_HEIGHT } from '@/config/constant'
 import { Icon } from '@/components/common/Icon'
 import { createStyle, type RowInfo } from '@/utils/tools'
 import { useTheme } from '@/store/theme/hook'
+import { useHorizontalMode } from '@/utils/hooks'
 import { useAssertApiSupport } from '@/store/common/hook'
 import { scaleSizeH } from '@/utils/pixelRatio'
 import Text from '@/components/common/Text'
@@ -42,6 +43,11 @@ export default memo(({ item, index, activeIndex, onPress, onShowMenu, onLongPres
   const active = activeIndex == index
 
   const singer = `${item.singer}${isShowAlbumName && item.meta.albumName ? ` · ${item.meta.albumName}` : ''}`
+  // 车机横屏：次要文字使用主题语义色，不用固定灰阶
+  const labelColor = active ? theme['c-primary-alpha-200'] : theme['c-font-label']
+  const intervalColor = active ? theme['c-primary-alpha-400'] : theme['c-font-label']
+  const snColor = theme['c-font-label']
+  const moreColor = theme['c-font-label']
 
   return (
     <View style={{ ...styles.listItem, width: rowInfo.rowWidth, height: ITEM_HEIGHT, backgroundColor: isSelected ? theme['c-primary-background-hover'] : 'rgba(0,0,0,0)', opacity: isSupported ? 1 : 0.5 }}>
@@ -49,7 +55,7 @@ export default memo(({ item, index, activeIndex, onPress, onShowMenu, onLongPres
         {
           active
             ? <Icon style={styles.sn} name="play-outline" size={13} color={theme['c-primary-font']} />
-            : <Text style={styles.sn} size={13} color={theme['c-300']}>{index + 1}</Text>
+            : <Text style={styles.sn} size={13} color={snColor}>{index + 1}</Text>
         }
         <View style={styles.itemInfo}>
           {/* <View style={styles.listItemTitle}> */}
@@ -57,20 +63,20 @@ export default memo(({ item, index, activeIndex, onPress, onShowMenu, onLongPres
           {/* </View> */}
           <View style={styles.listItemSingle}>
             <Badge>{item.source.toUpperCase()}</Badge>
-            <Text style={styles.listItemSingleText} size={11} color={active ? theme['c-primary-alpha-200'] : theme['c-500']} numberOfLines={1}>
+            <Text style={styles.listItemSingleText} size={11} color={labelColor} numberOfLines={1}>
               {singer}
             </Text>
           </View>
         </View>
         {
           isShowInterval ? (
-            <Text size={12} color={active ? theme['c-primary-alpha-400'] : theme['c-250']} numberOfLines={1}>{item.interval}</Text>
+            <Text size={12} color={intervalColor} numberOfLines={1}>{item.interval}</Text>
           ) : null
         }
       </TouchableOpacity>
       {/* <View style={styles.listItemRight}> */}
       <TouchableOpacity onPress={handleShowMenu} ref={moreButtonRef} style={styles.moreButton}>
-        <Icon name="dots-vertical" style={{ color: theme['c-350'] }} size={12} />
+        <Icon name="dots-vertical" style={{ color: moreColor }} size={12} />
       </TouchableOpacity>
       {/* </View> */}
     </View>

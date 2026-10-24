@@ -13,6 +13,8 @@ import themeState from '@/store/theme/state'
 import { NAV_SHEAR_NATIVE_IDS } from '@/config/constant'
 import { getStatusBarStyle } from './utils'
 import { windowSizeTools } from '@/utils/windowSizeTools'
+import { isHorizontalMode } from '@/utils/tools'
+import { setPlayDetailVisible } from '@/components/car/playDetailState'
 import { type ListInfoItem } from '@/store/songlist/state'
 
 // const store = getStore()
@@ -86,6 +88,13 @@ export async function pushHomeScreen() {
   })
 }
 export function pushPlayDetailScreen(componentId: string, skipAnimation = false) {
+  // 车机横屏：播放页是 Home 内部的常驻浮层，不再 push 新屏幕
+  // 这样首次打开后内容一直保留，不会每次都要重新渲染一遍（滑入过程中的白屏）
+  const winSize = windowSizeTools.getSize()
+  if (isHorizontalMode(winSize.width, winSize.height)) {
+    setPlayDetailVisible(true)
+    return
+  }
   /*
     Navigation.setDefaultOptions({
       topBar: {
@@ -144,45 +153,15 @@ export function pushPlayDetailScreen(componentId: string, skipAnimation = false)
             componentBackgroundColor: theme['c-content-background'],
           },
           animations: {
+            // 播放页以"抽屉"方式从右侧滑入（与关闭时滑出到右侧对应），不使用英雄动画
             push: skipAnimation ? {} : {
-              sharedElementTransitions: [
-                {
-                  fromId: NAV_SHEAR_NATIVE_IDS.playDetail_pic,
-                  toId: NAV_SHEAR_NATIVE_IDS.playDetail_pic,
-                  interpolation: { type: 'spring' },
+              content: {
+                translationX: {
+                  from: windowSizeTools.getSize().width,
+                  to: 0,
+                  duration: 300,
                 },
-              ],
-              elementTransitions: [
-                {
-                  id: NAV_SHEAR_NATIVE_IDS.playDetail_header,
-                  alpha: {
-                    from: 0, // We don't declare 'to' value as that is the element's current alpha value, here we're essentially animating from 0 to 1
-                    duration: 300,
-                  },
-                  translationY: {
-                    from: -32, // Animate translationY from 16dp to 0dp
-                    duration: 300,
-                  },
-                },
-                {
-                  id: NAV_SHEAR_NATIVE_IDS.playDetail_player,
-                  alpha: {
-                    from: 0, // We don't declare 'to' value as that is the element's current alpha value, here we're essentially animating from 0 to 1
-                    duration: 300,
-                  },
-                  translationY: {
-                    from: 32, // Animate translationY from 16dp to 0dp
-                    duration: 300,
-                  },
-                },
-              ],
-              // content: {
-              //   translationX: {
-              //     from: windowSizeTools.getSize().width,
-              //     to: 0,
-              //     duration: 300,
-              //   },
-              // },
+              },
             },
             pop: {
               content: {

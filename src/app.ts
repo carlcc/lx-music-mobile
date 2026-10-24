@@ -3,6 +3,7 @@ import { init as initLog } from '@/utils/log'
 import { bootLog, getBootLog } from '@/utils/bootLog'
 import '@/config/globalData'
 import { getFontSize } from '@/utils/data'
+import { initStorage } from '@/plugins/storage'
 import { exitApp } from './utils/nativeModules/utils'
 import { windowSizeTools } from './utils/windowSizeTools'
 import { listenLaunchEvent } from './navigation/regLaunchedEvent'
@@ -11,7 +12,11 @@ import { tipDialog } from './utils/tools'
 console.log('starting app...')
 listenLaunchEvent()
 
-void Promise.all([getFontSize(), windowSizeTools.init()]).then(async([fontSize]) => {
+// 存储现在直接放在外部存储，必须先申请权限并确定目录，才能进行任何读写
+void (async() => {
+  await initStorage()
+  return Promise.all([getFontSize(), windowSizeTools.init()])
+})().then(async([fontSize]) => {
   global.lx.fontSize = fontSize
   bootLog('Font size setting loaded.')
 

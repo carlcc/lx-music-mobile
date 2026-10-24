@@ -1,6 +1,8 @@
 import { addListMusics, getListMusics, removeListMusics, removeUserList, setFetchingListStatus, updateListMusics } from '@/core/list'
 import { confirmDialog, handleReadFile, handleSaveFile, showImportTip, toast } from '@/utils/tools'
 import syncSourceList from '@/core/syncSourceList'
+import { getMusicUrl } from '@/core/music'
+import { cacheAuditionMusic, isAuditionCached } from '@/core/auditionCache'
 import { log } from '@/utils/log'
 import { filterFileName, filterMusicList, formatPlayTime2, toNewMusicInfo } from '@/utils'
 import { handleImportListPart } from '@/screens/Home/Views/Setting/settings/Backup/actions'
@@ -76,6 +78,50 @@ export const handleExport = (listInfo: LX.List.MyListInfo, path: string) => {
     log.error(err.message)
     toast(global.i18n.t('setting_backup_part_export_list_tip_failed') + ': ' + (err.message as string))
   })
+}
+
+/**
+ * 缓存全部：提前把歌单里的歌全部下载到本地缓存
+ * 已缓存 / 本地歌曲会跳过，逐个串行下载（避免触发音源限流）
+ */
+export const handleCacheAll = async(listInfo: LX.List.MyListInfo) => {
+  if (!settingState.setting['car.auditionCache']) {
+    toast('音乐缓存未开启，请先在设置中开启')
+    return
+  }
+  setFetchingListStatus(listInfo.id, true)
+  try {
+    const musics = await getListMusics(listInfo.id)
+    if (!musics.length) {
+      toast('歌单还没有歌曲')
+      return
+    }
+    toast(`开始缓存「${listInfo.name}」· 共 ${musics.length} 首`, 'long')
+    let cached = 0
+    let success = 0
+    let failed = 0
+    for (const musicInfo of musics) {
+      // 本地歌曲本身就是文件，不需要缓存
+      if (musicInfo.source == 'local' || 'progress' in musicInfo) continue
+      if (await isAuditionCached(musicInfo)) {
+        cached++
+        continue
+      }
+      const { url } = await getMusicUrl({ musicInfo, isRefresh: false }).catch(() => ({ url: '', quality: null }))
+      if (!url) {
+        failed++
+        continue
+      }
+      if (await cacheAuditionMusic(musicInfo, url)) success++
+      else failed++
+    }
+    toast(`缓存完成：新增 ${success} 首 · 已缓存 ${cached} 首 · 失败 ${failed} 首`, 'long')
+  } catch (err) {
+    log.error(err)
+    toast('缓存失败')
+  } finally {
+    setFetchingListStatus(listInfo.id, false)
+  }
 }
 
 export const handleSync = (listInfo: LX.List.UserListInfo) => {

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'reac
 import { FlatList, type FlatListProps, RefreshControl, View } from 'react-native'
 
 // import { useMusicList } from '@/store/list/hook'
-import ListItem, { ITEM_HEIGHT } from './ListItem'
+import ListItem, { useListItemHeight } from './ListItem'
 import { createStyle, getRowInfo, type RowInfoType } from '@/utils/tools'
 import type { Position } from './ListMenu'
 import type { SelectMode } from './MultipleModeBar'
@@ -13,6 +13,9 @@ import { useI18n } from '@/lang'
 import Text from '@/components/common/Text'
 import { handlePlay } from './listAction'
 import { useSettingValue } from '@/store/setting/hook'
+import { useHorizontalMode } from '@/utils/hooks'
+import { carPlayMusic } from '@/components/car/action'
+import { CAR } from '@/components/car/constants'
 
 type FlatListType = FlatListProps<LX.Music.MusicInfoOnline>
 
@@ -31,6 +34,7 @@ export interface ListProps {
   ListHeaderComponent?: FlatListType['ListEmptyComponent']
   checkHomePagerIdle: boolean
   rowType?: RowInfoType
+  showAddToPlaylist?: boolean
 }
 export interface ListType {
   setList: (list: LX.Music.MusicInfoOnline[], isAppend: boolean, showSource: boolean) => void
@@ -55,15 +59,19 @@ const List = forwardRef<ListType, ListProps>(({
   ListHeaderComponent,
   checkHomePagerIdle,
   rowType,
+  showAddToPlaylist = true,
 }, ref) => {
   // const t = useI18n()
   const theme = useTheme()
+  const isHorizontalMode = useHorizontalMode()
+  const itemHeight = useListItemHeight()
   const flatListRef = useRef<FlatList>(null)
   const [currentList, setList] = useState<LX.Music.MusicInfoOnline[]>([])
   const [showSource, setShowSource] = useState(false)
   const isMultiSelectModeRef = useRef(false)
   const selectModeRef = useRef<SelectMode>('single')
   const prevSelectIndexRef = useRef(-1)
+  const lastPressRef = useRef<{ time: number, index: number }>({ time: 0, index: -1 })
   const [selectedList, setSelectedList] = useState<LX.Music.MusicInfoOnline[]>([])
   const selectedListRef = useRef<LX.Music.MusicInfoOnline[]>([])
   const [visibleMultiSelect, setVisibleMultiSelect] = useState(false)
@@ -156,13 +164,25 @@ const List = forwardRef<ListType, ListProps>(({
       if (checkHomePagerIdle && !global.lx.homePagerIdle) return
       if (isMultiSelectModeRef.current) {
         handleSelect(item, index)
-      } else {
-        if (settingState.setting['list.isClickPlayList'] && onPlayList != null) {
-          onPlayList(index)
+        return
+      }
+      // 车机横屏：单击不播放，双击（400ms 内连点同一行）才播放，防误触
+      if (isHorizontalMode) {
+        const now = Date.now()
+        const last = lastPressRef.current
+        if (last.index == index && now - last.time < 400) {
+          lastPressRef.current = { time: 0, index: -1 }
+          void carPlayMusic(currentList[index])
         } else {
-          // console.log(currentList[index])
-          handlePlay(currentList[index])
+          lastPressRef.current = { time: now, index }
         }
+        return
+      }
+      if (settingState.setting['list.isClickPlayList'] && onPlayList != null) {
+        onPlayList(index)
+      } else {
+        // console.log(currentList[index])
+        handlePlay(currentList[index])
       }
     })
   }
@@ -175,7 +195,8 @@ const List = forwardRef<ListType, ListProps>(({
   }
 
   const handleLoadMore = () => {
-    if (status != 'idle') return
+    // 列表为空时（首屏、或切 tab 重建后数据还没恢复）FlatList 会判定"已到末尾"而误触发一次，这里直接忽略
+    if (status != 'idle' || !currentList.length) return
     onLoadMore()
   }
 
@@ -192,11 +213,12 @@ const List = forwardRef<ListType, ListProps>(({
       rowInfo={rowInfo.current}
       isShowAlbumName={isShowAlbumName}
       isShowInterval={isShowInterval}
+      showAddToPlaylist={showAddToPlaylist}
     />
   )
   const getkey: FlatListType['keyExtractor'] = item => item.id
   const getItemLayout: FlatListType['getItemLayout'] = (data, index) => {
-    return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
+    return { length: itemHeight, offset: itemHeight * index, index }
   }
   const refreshControl = useMemo(() => (
     <RefreshControl
@@ -232,7 +254,8 @@ const List = forwardRef<ListType, ListProps>(({
   return (
     <FlatList
       ref={flatListRef}
-      style={styles.list}
+      // 车机横屏：右侧留出与页面其它区域一致的边距，避免行内容贴到窗口边缘
+      style={isHorizontalMode ? [styles.list, styles.listHorizontal] : styles.list}
       data={currentList}
       numColumns={rowInfo.current.rowNum}
       horizontal={false}
@@ -285,6 +308,9 @@ const styles = createStyle({
   list: {
     flexGrow: 1,
     flexShrink: 1,
+  },
+  listHorizontal: {
+    paddingRight: CAR.padding,
   },
   footer: {
     textAlign: 'center',

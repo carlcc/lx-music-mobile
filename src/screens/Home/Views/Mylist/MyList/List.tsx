@@ -9,6 +9,7 @@ import { createStyle } from '@/utils/tools'
 import { LIST_SCROLL_POSITION_KEY } from '@/config/constant'
 import { getListPosition, saveListPosition } from '@/utils/data'
 import { setActiveList } from '@/core/list'
+import { replaceQueueWithList } from '@/core/player/queue'
 import Text from '@/components/common/Text'
 import { type Position } from './ListMenu'
 import { scaleSizeH } from '@/utils/pixelRatio'
@@ -30,6 +31,12 @@ const ListItem = memo(({ item, index, activeId, onPress, onShowMenu }: {
   const fetching = useListFetching(item.id)
 
   const active = activeId == item.id
+
+  // 车机：直接播放这个歌单（省去先切换再播放的步骤）
+  // 复制到临时列表再播，队列里的增删不会影响这个歌单
+  const handlePlay = () => {
+    void replaceQueueWithList(item.id, 0)
+  }
 
   const handleShowMenu = () => {
     if (moreButtonRef.current?.measure) {
@@ -55,8 +62,11 @@ const ListItem = memo(({ item, index, activeId, onPress, onShowMenu }: {
       <TouchableOpacity style={styles.listName} onPress={handlePress}>
         <Text numberOfLines={1} color={active ? theme['c-primary-font'] : theme['c-font']}>{item.name}</Text>
       </TouchableOpacity>
+      <TouchableOpacity onPress={handlePlay} style={styles.listPlayBtn}>
+        <Icon name="play" color={theme['c-font']} rawSize={16} />
+      </TouchableOpacity>
       <TouchableOpacity onPress={handleShowMenu} ref={moreButtonRef} style={styles.listMoreBtn}>
-        <Icon name="dots-vertical" color={theme['c-350']} size={12} />
+        <Icon name="dots-vertical" color={theme['c-font']} size={12} />
       </TouchableOpacity>
     </View>
   )
@@ -176,6 +186,12 @@ const styles = createStyle({
   //   // height: 46,
   //   fontSize: 14,
   // },
+  listPlayBtn: {
+    height: '100%',
+    width: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listMoreBtn: {
     height: '100%',
     width: 36,

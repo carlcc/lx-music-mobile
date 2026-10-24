@@ -21,6 +21,9 @@ export const search = async(text: string, page: number, sourceId: Source): Promi
   const listInfo = searchMusicState.listInfos[sourceId]!
   if (!text) return []
   const key = `${page}__${text}`
+  // 所有音源都记录最后一次搜索的词，便于界面重建时直接从缓存恢复、不再发起网络请求
+  setSearchText(text)
+  setSource(sourceId)
   if (sourceId == 'all') {
     listInfo.key = key
     let task = []
@@ -39,8 +42,6 @@ export const search = async(text: string, page: number, sourceId: Source): Promi
     }
     return Promise.all(task).then((results: SearchResult[]) => {
       if (key != listInfo.key) return []
-      setSearchText(text)
-      setSource(sourceId)
       return setListInfo(results, page, text)
     })
   } else {

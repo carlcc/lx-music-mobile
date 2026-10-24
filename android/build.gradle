@@ -4,10 +4,10 @@ buildscript {
     ext {
         buildToolsVersion = "35.0.0"
         minSdkVersion = 21
-        compileSdkVersion = 36
+        compileSdkVersion = 35
         targetSdkVersion = 29
 
-        ndkVersion = "26.1.10909125"
+        ndkVersion = "30.0.16248370"
         kotlinVersion = "1.9.24" // Or any version above 1.3.x
         RNNKotlinVersion = kotlinVersion
 
@@ -26,3 +26,15 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// AGP 8.6.1 内置默认 NDK 为 26.1.10909125，未声明 ndkVersion 的模块（如
+// react-native-quick-base64）会回退到该默认值并尝试联网安装。这里强制所有
+// Android 模块使用已安装的版本，避免下载。
+subprojects { subproject ->
+    subproject.plugins.whenPluginAdded {
+        def androidExt = subproject.extensions.findByName('android')
+        if (androidExt != null) {
+            androidExt.ndkVersion rootProject.ext.ndkVersion
+        }
+    }
+}

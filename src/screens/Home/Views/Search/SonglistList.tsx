@@ -21,27 +21,26 @@ export default forwardRef<MusicListType, {}>((props, ref) => {
   useImperativeHandle(ref, () => ({
     async loadList(text, source) {
       // const listDetailInfo = searchSonglistState.listDetailInfo
-      listRef.current?.setList([], source == 'all')
+      searchInfoRef.current.text = text
+      searchInfoRef.current.source = source
+      // 命中缓存（切 tab 回来）：直接恢复，不要再先清空列表，避免先闪一下空列表
       if (searchSonglistState.searchText == text && searchSonglistState.source == source && searchSonglistState.listInfos[searchSonglistState.source]!.list.length) {
-        requestAnimationFrame(() => {
-          listRef.current?.setList(searchSonglistState.listInfos[searchSonglistState.source]!.list, source == 'all')
-        })
-      } else {
-        listRef.current?.setStatus('loading')
-        const page = 1
-        searchInfoRef.current.text = text
-        searchInfoRef.current.source = source
-        return search(text, page, source).then((list) => {
-          // const result = setListInfo(listDetail, id, page)
-          if (isUnmountedRef.current) return
-          requestAnimationFrame(() => {
-            listRef.current?.setList(list, source == 'all')
-            listRef.current?.setStatus(searchSonglistState.maxPages[searchSonglistState.source] == page ? 'end' : 'idle')
-          })
-        }).catch(() => {
-          listRef.current?.setStatus('error')
-        })
+        listRef.current?.setList(searchSonglistState.listInfos[searchSonglistState.source]!.list, source == 'all')
+        return
       }
+      listRef.current?.setList([], source == 'all')
+      listRef.current?.setStatus('loading')
+      const page = 1
+      return search(text, page, source).then((list) => {
+        // const result = setListInfo(listDetail, id, page)
+        if (isUnmountedRef.current) return
+        requestAnimationFrame(() => {
+          listRef.current?.setList(list, source == 'all')
+          listRef.current?.setStatus(searchSonglistState.maxPages[searchSonglistState.source] == page ? 'end' : 'idle')
+        })
+      }).catch(() => {
+        listRef.current?.setStatus('error')
+      })
     },
   }), [])
 

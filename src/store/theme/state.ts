@@ -259,7 +259,8 @@ const state: InitState = {
     'c-badge-tertiary': '#e7aa36',
 
     'c-font': theme['c-850'],
-    'c-font-label': theme['c-450'],
+    // 与 buildActiveThemeColors 保持一致：c-450 在浅色主题上对比度只有约 2.8:1，改用 c-650
+    'c-font-label': theme['c-650'],
     'c-primary-font': theme['c-primary'],
     'c-primary-font-hover': theme['c-primary-alpha-300'],
     'c-primary-font-active': theme['c-primary-dark-100-alpha-200'],

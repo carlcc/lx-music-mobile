@@ -4,7 +4,7 @@ import { FlatList, View, RefreshControl, type FlatListProps } from 'react-native
 import ListItem from './ListItem'
 // import { navigations } from '@/navigation'
 import { type ListInfoItem } from '@/store/songlist/state'
-import { useLayout } from '@/utils/hooks'
+import { useLayout, useHorizontalMode } from '@/utils/hooks'
 import { useTheme } from '@/store/theme/hook'
 import { useI18n } from '@/lang'
 import { scaleSizeW } from '@/utils/pixelRatio'

@@ -242,3 +242,12 @@ export const b64DecodeUnicode = (str: string) => {
   // Going backwards: from bytestream, to percent-encoding, to original string.
   return Buffer.from(str, 'base64').toString()
 }
+
+/**
+ * 年月日时分秒，如 2026-10-23 17:35:09
+ * 用于自动生成的歌单名 —— 精确到秒，避免同一天多次新建时重名
+ */
+export const formatDateTimeName = (date = new Date()) => {
+  const p = (num: number) => String(num).padStart(2, '0')
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`
+}

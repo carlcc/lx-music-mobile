@@ -1,4 +1,7 @@
 import state, { type InitState } from './state'
+
+/** 搜索历史最多保留条数 */
+const MAX_HISTORY_NUM = 10
 // let isInitedSearchHistory = false
 // const saveSearchHistoryListThrottle = throttle((list: LX.List.SearchHistoryList) => {
 //   saveSearchHistoryList(list)
@@ -50,7 +53,7 @@ export default {
     let index = state.historyList.indexOf(word)
     if (index == 0) return
     if (index > -1) state.historyList.splice(index, 1)
-    if (state.historyList.length >= 15) state.historyList.splice(14, state.historyList.length - 14)
+    if (state.historyList.length >= MAX_HISTORY_NUM) state.historyList.splice(MAX_HISTORY_NUM - 1, state.historyList.length - (MAX_HISTORY_NUM - 1))
     state.historyList.unshift(word)
     return [...state.historyList]
   },

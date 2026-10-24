@@ -19,6 +19,12 @@ import {
 } from './local'
 
 
+export interface MusicUrlInfo {
+  url: string
+  /** 实际拿到的音质；本地文件 / 下载项为 null */
+  quality: LX.Quality | null
+}
+
 export const getMusicUrl = async({
   musicInfo,
   quality,
@@ -31,11 +37,11 @@ export const getMusicUrl = async({
   quality?: LX.Quality
   onToggleSource?: (musicInfo?: LX.Music.MusicInfoOnline) => void
   allowToggleSource?: boolean
-}): Promise<string> => {
+}): Promise<MusicUrlInfo> => {
   if ('progress' in musicInfo) {
     return getDownloadMusicUrl({ musicInfo, isRefresh, onToggleSource, allowToggleSource })
   } else if (musicInfo.source == 'local') {
-    return getLocalMusicUrl({ musicInfo, isRefresh, onToggleSource, allowToggleSource })
+    return { url: await getLocalMusicUrl({ musicInfo, isRefresh, onToggleSource, allowToggleSource }), quality: null }
   } else {
     return getOnlineMusicUrl({ musicInfo, isRefresh, quality, onToggleSource, allowToggleSource })
   }
@@ -46,16 +52,19 @@ export const getPicPath = async({
   isRefresh = false,
   listId,
   onToggleSource,
+  allowToggleSource,
 }: {
   musicInfo: LX.Music.MusicInfo | LX.Download.ListItem
   listId?: string | null
   isRefresh?: boolean
   onToggleSource?: (musicInfo?: LX.Music.MusicInfoOnline) => void
+  /** false：不允许联网换源（离线播放时用） */
+  allowToggleSource?: boolean
 }): Promise<string> => {
   if ('progress' in musicInfo) {
     return getDownloadPicUrl({ musicInfo, isRefresh, listId, onToggleSource })
   } else if (musicInfo.source == 'local') {
-    return getLocalPicUrl({ musicInfo, isRefresh, listId, onToggleSource })
+    return getLocalPicUrl({ musicInfo, isRefresh, listId, onToggleSource, allowToggleSource })
   } else {
     return getOnlinePicUrl({ musicInfo, isRefresh, listId, onToggleSource })
   }
@@ -65,15 +74,18 @@ export const getLyricInfo = async({
   musicInfo,
   isRefresh = false,
   onToggleSource,
+  allowToggleSource,
 }: {
   musicInfo: LX.Music.MusicInfo | LX.Download.ListItem
   isRefresh?: boolean
   onToggleSource?: (musicInfo?: LX.Music.MusicInfoOnline) => void
+  /** false：不允许联网换源（离线播放时用） */
+  allowToggleSource?: boolean
 }): Promise<LX.Player.LyricInfo> => {
   if ('progress' in musicInfo) {
     return getDownloadLyricInfo({ musicInfo, isRefresh, onToggleSource })
   } else if (musicInfo.source == 'local') {
-    return getLocalLyricInfo({ musicInfo, isRefresh, onToggleSource })
+    return getLocalLyricInfo({ musicInfo, isRefresh, onToggleSource, allowToggleSource })
   } else {
     return getOnlineLyricInfo({ musicInfo, isRefresh, onToggleSource })
   }

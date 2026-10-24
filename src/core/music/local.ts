@@ -15,6 +15,7 @@ import {
 import { getLocalFilePath } from '@/utils/music'
 import { readLyric, readPic } from '@/utils/localMediaMetadata'
 import { stat } from '@/utils/fs'
+import { findCachePicPathByAudio, readCacheLyricByAudio } from '@/core/auditionCache'
 
 const getOtherSourceByLocal = async<T>(musicInfo: LX.Music.MusicInfoLocal, handler: (infos: LX.Music.MusicInfoOnline[]) => Promise<T>) => {
   let result: LX.Music.MusicInfoOnline[] = []
@@ -78,6 +79,9 @@ export const getMusicUrl = async({ musicInfo, isRefresh, allowToggleSource = tru
     if (path) return path
   }
 
+  // 严格离线：本地文件不存在就直接失败，不再尝试任何联网取 url
+  if (!allowToggleSource) throw new Error('failed')
+
   try {
     return await getOnlineOtherSourceMusicUrlByLocal(musicInfo, isRefresh).then(({ url, quality, isFromCache }) => {
       if (!isFromCache) void saveMusicUrl(musicInfo, quality, url)
@@ -99,14 +103,22 @@ export const getMusicUrl = async({ musicInfo, isRefresh, allowToggleSource = tru
   })
 }
 
-export const getPicUrl = async({ musicInfo, listId, isRefresh, skipFilePic, onToggleSource = () => {} }: {
+export const getPicUrl = async({ musicInfo, listId, isRefresh, skipFilePic, allowToggleSource = true, onToggleSource = () => {} }: {
   musicInfo: LX.Music.MusicInfoLocal
   listId?: string | null
   isRefresh: boolean
   skipFilePic?: boolean
+  /** false：不允许联网换源（离线播放时用） */
+  allowToggleSource?: boolean
   onToggleSource?: (musicInfo?: LX.Music.MusicInfoOnline) => void
 }): Promise<string> => {
   if (!isRefresh && !skipFilePic) {
+    // ① 优先用缓存目录里的封面文件（我们自己缓存的那份，零流量）
+    // 按音频路径推导基名：离线歌曲的 source 是 local，不能直接拿 musicInfo 拼
+    const cachePic = await findCachePicPathByAudio(musicInfo.meta.filePath).catch(() => null)
+    if (cachePic) return `file://${cachePic}`
+
+    // ② 其次读音频文件内嵌的封面
     let pic = await readPic(musicInfo.meta.filePath).catch(() => null)
     if (pic) {
       if (pic.startsWith('/')) pic = `file://${pic}`
@@ -121,6 +133,8 @@ export const getPicUrl = async({ musicInfo, listId, isRefresh, skipFilePic, onTo
       return url
     })
   } catch {}
+
+  if (!allowToggleSource) throw new Error('failed')
 
   onToggleSource()
   return getOtherSourceByLocal(musicInfo, async(otherSource) => {
@@ -188,13 +202,19 @@ const getMusicFileLyric = async(filePath: string) => {
   if (!lyric) return null
   return parseLyric(lyric)
 }
-export const getLyricInfo = async({ musicInfo, isRefresh, skipFileLyric, onToggleSource = () => {} }: {
+export const getLyricInfo = async({ musicInfo, isRefresh, skipFileLyric, allowToggleSource = true, onToggleSource = () => {} }: {
   musicInfo: LX.Music.MusicInfoLocal
   skipFileLyric?: boolean
   isRefresh: boolean
+  /** false：不允许联网换源（离线播放时用） */
+  allowToggleSource?: boolean
   onToggleSource?: (musicInfo?: LX.Music.MusicInfoOnline) => void
 }): Promise<LX.Player.LyricInfo> => {
   if (!isRefresh && !skipFileLyric) {
+    // ① 优先用缓存目录里的歌词文件（我们自己缓存的那份，零流量）
+    const cacheLyric = await readCacheLyricByAudio(musicInfo.meta.filePath).catch(() => null)
+    if (cacheLyric) return buildLyricInfo(parseLyric(cacheLyric))
+
     // const lyricInfo = await getCachedLyricInfo(musicInfo)
     // if (lyricInfo?.rawlrcInfo.lyric && lyricInfo.lyric != lyricInfo.rawlrcInfo.lyric) {
     //   // 存在已编辑歌词
@@ -216,6 +236,8 @@ export const getLyricInfo = async({ musicInfo, isRefresh, skipFileLyric, onToggl
       return buildLyricInfo(lyricInfo)
     })
   } catch {}
+
+  if (!allowToggleSource) throw new Error('failed')
 
   onToggleSource()
   return getOtherSourceByLocal(musicInfo, async(otherSource) => {

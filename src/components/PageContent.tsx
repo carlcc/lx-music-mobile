@@ -8,6 +8,9 @@ import { scaleSizeAbsHR } from '@/utils/pixelRatio'
 import { defaultHeaders } from './common/Image'
 import SizeView from './SizeView'
 import { useBgPic } from '@/store/common/hook'
+import useHorizontalMode from '@/utils/hooks/useHorizontalMode'
+import CarBg from '@/components/car/CarBg'
+import { BgImageContext } from '@/components/common/BgImageContext'
 
 interface Props {
   children: React.ReactNode
@@ -19,6 +22,7 @@ export default ({ children }: Props) => {
   const theme = useTheme()
   const windowSize = useWindowSize()
   const pic = useBgPic()
+  const isHorizontal = useHorizontalMode()
   // const [wh, setWH] = useState<{ width: number | string, height: number | string }>({ width: '100%', height: Dimensions.get('screen').height })
 
   // 固定宽高度 防止弹窗键盘时大小改变导致背景被缩放
@@ -47,9 +51,11 @@ export default ({ children }: Props) => {
         resizeMode="cover"
       >
       </ImageBackground>
-      <View style={{ flex: 1, flexDirection: 'column', backgroundColor: theme['c-main-background'] }}>
-        {children}
-      </View>
+      <BgImageContext.Provider value={!!theme['bg-image']}>
+        <View style={{ flex: 1, flexDirection: 'column', backgroundColor: theme['c-main-background'] }}>
+          {children}
+        </View>
+      </BgImageContext.Provider>
     </View>
   ), [children, theme, windowSize.height, windowSize.width])
   const picComponent = useMemo(() => {
@@ -63,17 +69,27 @@ export default ({ children }: Props) => {
         >
           <View style={{ flex: 1, flexDirection: 'column', backgroundColor: theme['c-content-background'], opacity: 0.76 }}></View>
         </ImageBackground>
-        <View style={{ flex: 1, flexDirection: 'column' }}>
-          {children}
-        </View>
+        <BgImageContext.Provider value={!!pic}>
+          <View style={{ flex: 1, flexDirection: 'column' }}>
+            {children}
+          </View>
+        </BgImageContext.Provider>
       </View>
     )
   }, [children, pic, theme, windowSize.height, windowSize.width])
 
+  // 车机横屏：模糊强度/暗化/来源均可调，可完全关闭（低配车机省 GPU）
+  // 与弹窗卡片（CarBg）共用同一套背景规则
+  const carComponent = useMemo(() => (
+    <CarBg style={{ flex: 1 }}>
+      {children}
+    </CarBg>
+  ), [children])
+
   return (
     <>
       <SizeView />
-      {pic ? picComponent : themeComponent}
+      {isHorizontal ? carComponent : (pic ? picComponent : themeComponent)}
     </>
   )
 }

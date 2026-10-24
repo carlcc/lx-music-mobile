@@ -3,6 +3,8 @@ import { type ListInfoItem } from '@/store/songlist/state'
 // import LoadingMask, { LoadingMaskType } from '@/components/common/LoadingMask'
 import List, { type ListProps, type ListType, type Status } from './List'
 import { navigations } from '@/navigation'
+import { useHorizontalMode } from '@/utils/hooks'
+import { setCarSonglistDetail } from '@/components/car/carDetailState'
 import commonState from '@/store/common/state'
 
 export interface SonglistProps {
@@ -31,8 +33,14 @@ export default forwardRef<SonglistType, SonglistProps>(({
   }))
 
   const handleOpenDetail = (item: ListInfoItem, index: number) => {
+    // 车机横屏：歌单详情在"歌单 tab"内打开，左侧导航保持可见
+    if (isHorizontalMode) {
+      setCarSonglistDetail(item)
+      return
+    }
     navigations.pushSonglistDetailScreen(commonState.componentIds.home!, item)
   }
+  const isHorizontalMode = useHorizontalMode()
 
   return (
     <List

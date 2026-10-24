@@ -20,6 +20,7 @@ import {
   removeTempPlayList,
 } from '@/core/player/tempPlayList'
 import { getMusicUrl, getPicPath, getLyricInfo } from '@/core/music'
+import { cacheAuditionMusic, getAuditionCachePath, saveCacheLyric, saveCachePic } from '@/core/auditionCache'
 import { requestMsg } from '@/utils/message'
 import { getRandom } from '@/utils/common'
 import { filterList } from './utils'
@@ -30,6 +31,10 @@ import { addListMusics, removeListMusics } from '@/core/list'
 import { addDislikeInfo } from '@/core/dislikeList'
 
 // import { checkMusicFileAvailable } from '@renderer/utils/music'
+
+/** 是否离线缓存库里的歌曲（本地文件，不能联网取任何东西） */
+const isOfflineMusic = (musicInfo: LX.Music.MusicInfo | LX.Download.ListItem) =>
+  !('progress' in musicInfo) && musicInfo.source == 'local'
 
 const createDelayNextTimeout = (delay: number) => {
   let timeout: number | null
@@ -114,8 +119,26 @@ const getMusicPlayUrl = async(musicInfo: LX.Music.MusicInfo | LX.Download.ListIt
         setStatusText(global.i18n.t('toggle_source_try'))
       },
     })
-  }).then(url => {
+  }).then(async({ url, quality }: { url: string, quality: LX.Quality | null }) => {
     if (global.lx.isPlayedStop || diffCurrentMusicInfo(musicInfo)) return null
+    if (!url) return null
+
+    // 音乐缓存：所有在线来源的歌曲都"先缓存，再播放"
+    // - 已缓存 → 直接播本地文件（0 流量）
+    // - 未缓存 → 先下载到本地，完成后播本地；下载失败才回退在线播放
+    // 本地歌曲（离线缓存库）本身就是本地文件，不能再走在线缓存下载
+    if (isOfflineMusic(musicInfo)) return url
+    try {
+      // 按「歌名-歌手-平台-音质」四元组取缓存：命中直接播本地，未命中才下载
+      const cachedPath = await getAuditionCachePath(musicInfo, url, quality)
+      if (cachedPath) return cachedPath
+      if (settingState.setting['car.auditionCache'] && !('progress' in musicInfo)) {
+        setStatusText('正在缓存歌曲…')
+        // 下载完成后按实际拿到的音质登记到对应的四元组
+        const path = await cacheAuditionMusic(musicInfo, url, quality)
+        if (path) return path
+      }
+    } catch {}
 
     return url
   }).catch(async err => {
@@ -166,7 +189,11 @@ const handleRestorePlay = async(restorePlayInfo: LX.Player.SavedPlayInfo) => {
 
   void initTrackInfo(musicInfo, playerState.musicInfo)
 
-  void getPicPath({ musicInfo, listId: playMusicInfo.listId }).then((url: string) => {
+  // 离线歌曲（缓存库）不允许联网换源，封面/歌词一律走本地
+  void getPicPath({ musicInfo, listId: playMusicInfo.listId, allowToggleSource: !isOfflineMusic(musicInfo) }).then((url: string) => {
+    // 在线取到的封面顺手存一份到缓存目录，下次就不用再请求了
+    // 注意：落盘要放在下面的"界面是否需要更新"判断之前，否则封面没变化时永远不会缓存
+    if (url) void saveCachePic(musicInfo, url)
     if (
       musicInfo.id != playMusicInfo.musicInfo?.id ||
       playerState.musicInfo.pic == url ||
@@ -176,8 +203,10 @@ const handleRestorePlay = async(restorePlayInfo: LX.Player.SavedPlayInfo) => {
     global.app_event.picUpdated()
   })
 
-  void getLyricInfo({ musicInfo }).then((lyricInfo) => {
+  void getLyricInfo({ musicInfo, allowToggleSource: !isOfflineMusic(musicInfo) }).then((lyricInfo) => {
     if (musicInfo.id != playMusicInfo.musicInfo?.id) return
+    // 在线取到的歌词顺手存一份到缓存目录
+    void saveCacheLyric(musicInfo, lyricInfo.rawlrcInfo.lyric)
     setMusicInfo({
       lrc: lyricInfo.lyric,
       tlrc: lyricInfo.tlyric,
@@ -199,7 +228,8 @@ const handleRestorePlay = async(restorePlayInfo: LX.Player.SavedPlayInfo) => {
 const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic) => {
   setMusicUrl(musicInfo)
 
-  void getPicPath({ musicInfo, listId: playerState.playMusicInfo.listId }).then((url: string) => {
+  void getPicPath({ musicInfo, listId: playerState.playMusicInfo.listId, allowToggleSource: !isOfflineMusic(musicInfo) }).then((url: string) => {
+    if (url) void saveCachePic(musicInfo, url)
     if (
       musicInfo.id != playerState.playMusicInfo.musicInfo?.id ||
       playerState.musicInfo.pic == url ||
@@ -208,8 +238,9 @@ const debouncePlay = debounceBackgroundTimer((musicInfo: LX.Player.PlayMusic) =>
     global.app_event.picUpdated()
   })
 
-  void getLyricInfo({ musicInfo }).then((lyricInfo) => {
+  void getLyricInfo({ musicInfo, allowToggleSource: !isOfflineMusic(musicInfo) }).then((lyricInfo) => {
     if (musicInfo.id != playerState.playMusicInfo.musicInfo?.id) return
+    void saveCacheLyric(musicInfo, lyricInfo.rawlrcInfo.lyric)
     setMusicInfo({
       lrc: lyricInfo.lyric,
       tlrc: lyricInfo.tlyric,
@@ -294,6 +325,7 @@ export const playList = async(listId: string, index: number) => {
   clearTempPlayeList()
   await handlePlay()
 }
+
 
 const handleToggleStop = async() => {
   await stop()

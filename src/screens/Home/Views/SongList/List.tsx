@@ -6,7 +6,7 @@ import { type Source } from '@/store/songlist/state'
 
 
 export interface ListType {
-  loadList: (source: Source, sortId: string, tagId: string) => void
+  loadList: (source: Source, sortId: string, tagId: string) => Promise<void>
 }
 
 export default forwardRef<ListType, {}>((props, ref) => {

@@ -10,8 +10,9 @@ import initCommonState from './common'
 import { initDeeplink } from './deeplink'
 import { setApiSource } from '@/core/apiSource'
 import commonActions from '@/store/common/action'
+import { initOnlineImgCache } from '@/core/onlineImgCache'
+import { ensureAuditionCacheReady, initAuditionCache } from '@/core/auditionCache'
 import settingState from '@/store/setting/state'
-import { checkUpdate } from '@/core/version'
 import { bootLog } from '@/utils/bootLog'
 import { cheatTip } from '@/utils/tools'
 
@@ -21,7 +22,6 @@ const handlePushedHomeScreen = async() => {
   if (settingState.setting['common.isAgreePact']) {
     if (isFirstPush) {
       isFirstPush = false
-      void checkUpdate()
       void initDeeplink()
     }
   } else {
@@ -62,6 +62,14 @@ export default async() => {
 
   void initSync(setting)
   bootLog('Sync inited.')
+
+  // 清理：在线封面过期缓存 + 音乐缓存中已无歌单引用的文件（不阻塞启动）
+  void initOnlineImgCache(setting['car.imgCacheDays'])
+  // 申请存储权限（没有权限时提示用户允许）并自动创建缓存目录
+  void ensureAuditionCacheReady().then(ready => {
+    if (ready) void initAuditionCache()
+  })
+  bootLog('Cache inited.')
 
   // syncSetting()
 

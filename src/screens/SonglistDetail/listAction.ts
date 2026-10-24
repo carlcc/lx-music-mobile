@@ -5,6 +5,7 @@ import { LIST_IDS } from '@/config/constant'
 import listState from '@/store/list/state'
 import syncSourceList from '@/core/syncSourceList'
 import { confirmDialog, toMD5, toast } from '@/utils/tools'
+import { fixNewMusicInfoQuality } from '@/utils'
 import { type Source } from '@/store/songlist/state'
 
 const getListId = (id: string, source: LX.OnlineSource) => `${source}__${id}`
@@ -34,7 +35,8 @@ export const handlePlay = async(id: string, source: Source, list?: LX.Music.Musi
 export const handleCollect = async(id: string, source: Source, name: string) => {
   const listId = getListId(id, source)
 
-  const targetList = listState.userList.find(l => l.sourceListId == listId)
+  // 注意：sourceListId 存的是在线歌单原始 id（syncSourceList 按它去拉在线数据），所以这里也用原始 id 匹配
+  const targetList = listState.userList.find(l => l.source == source && l.sourceListId == id)
   if (targetList) {
     const confirm = await confirmDialog({
       message: global.i18n.t('duplicate_list_tip', { name: targetList.name }),
@@ -46,11 +48,12 @@ export const handleCollect = async(id: string, source: Source, name: string) => 
     return
   }
 
+  // 在线歌单完整拷贝到本地（后续打开我的歌单走本地，同步时再覆盖刷新）
   const list = await getListDetailAll(source, id)
   await createList({
     name,
     id: `${source}_${toMD5(listId)}`,
-    list,
+    list: list.map(m => fixNewMusicInfoQuality(m)),
     source,
     sourceListId: id,
   })

@@ -355,6 +355,72 @@ declare global {
        * 是否启用同步
        */
       'sync.enable': boolean
+
+      /**
+       * 车机横屏-背景模糊开关
+       */
+      'car.bgBlur': boolean
+
+      /**
+       * 车机横屏-背景毛玻璃滤镜（基于主题背景图叠加模糊 + 半透明玻璃层）
+       */
+      'car.bgGlass': boolean
+
+      /**
+       * 车机横屏-在线封面本地缓存天数，0 表示不缓存
+       */
+      'car.imgCacheDays': number
+
+      /**
+       * 试听歌曲缓存开关
+       */
+      'car.auditionCache': boolean
+
+      /**
+       * 试听歌曲缓存目录（外部存储，默认 Music/lxcache）
+       */
+      'car.auditionCacheDir': string
+
+      /**
+       * 车机横屏-背景模糊强度 0-25，0 表示不模糊
+       */
+      'car.bgBlurRadius': number
+
+      /**
+       * 车机横屏-背景暗化程度 0-0.8
+       */
+      'car.bgDim': number
+
+      /**
+       * 车机横屏-内容层底纹不透明度 0-1
+       * 在承载文字的内容层再铺一层主题底色，保证任意背景图片下文字都有足够对比度
+       */
+      'car.contentScrim': number
+
+      /**
+       * 车机横屏-背景来源：当前歌曲封面 / 主题壁纸 / 纯色
+       */
+      'car.bgSource': 'cover' | 'theme' | 'color'
+
+      /**
+       * 车机横屏-播放页使用黑胶唱片
+       */
+      'car.vinyl': boolean
+
+      /**
+       * 车机横屏-启动落地页（nav id）
+       */
+      'car.startupView': string
+
+      /**
+       * 车机横屏-字号缩放 0.9-1.4
+       */
+      'car.fontScale': number
+
+      /**
+       * 车机横屏-试听/搜索播放时自动加入的列表：试听列表 / 我的收藏 / 不自动加入
+       */
+      'car.autoAddDefaultList': 'default' | 'love' | 'none'
     }
   }
 }

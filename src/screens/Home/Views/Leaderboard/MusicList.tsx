@@ -3,6 +3,10 @@ import OnlineList, { type OnlineListType, type OnlineListProps } from '@/compone
 import { clearListDetail, getListDetail, setListDetail, setListDetailInfo } from '@/core/leaderboard'
 import boardState from '@/store/leaderboard/state'
 import { handlePlay } from './listAction'
+import { RowActionsContext, type RowActionsConfig } from '@/components/car/rowActionsConfig'
+
+/** 排行榜右侧卡片：只保留菜单按钮 */
+const ROW_ACTIONS_NO_ADD: RowActionsConfig = { showAdd: false }
 
 // export type MusicListProps = Pick<OnlineListProps,
 // 'onLoadMore'
@@ -84,13 +88,20 @@ export default forwardRef<MusicListType, {}>((props, ref) => {
     })
   }
 
-  return <OnlineList
-    ref={listRef}
-    onPlayList={handlePlayList}
-    onRefresh={handleRefresh}
-    onLoadMore={handleLoadMore}
-    checkHomePagerIdle
-    rowType='medium'
-   />
+  // 右侧卡片条目偏窄：只保留菜单按钮，加入歌单走长按菜单
+  // 用 context 下发，避免逐层传 prop 被中间组件漏掉
+  return (
+    <RowActionsContext.Provider value={ROW_ACTIONS_NO_ADD}>
+      <OnlineList
+        ref={listRef}
+        onPlayList={handlePlayList}
+        onRefresh={handleRefresh}
+        onLoadMore={handleLoadMore}
+        checkHomePagerIdle
+        rowType='medium'
+        showAddToPlaylist={false}
+      />
+    </RowActionsContext.Provider>
+  )
 })
 

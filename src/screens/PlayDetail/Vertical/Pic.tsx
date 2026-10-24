@@ -19,9 +19,11 @@ export default ({ componentId }: { componentId: string }) => {
 
   const [animated, setAnimated] = useState(!!commonState.componentIds.playDetail)
   const [pic, setPic] = useState(musicInfo.pic)
+  // 封面实时跟随当前歌曲：英雄动画已改为右侧滑入，不能再等 componentDidAppear，
+  // 否则滑入过程中一直是空白，动画结束后封面才突然出现
   useEffect(() => {
-    if (animated) setPic(musicInfo.pic)
-  }, [musicInfo.pic, animated])
+    setPic(musicInfo.pic)
+  }, [musicInfo.pic])
 
   useNavigationComponentDidAppear(componentId, () => {
     setAnimated(true)

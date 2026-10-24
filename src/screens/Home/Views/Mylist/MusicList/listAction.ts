@@ -1,5 +1,6 @@
 import { addListMusics, removeListMusics, updateListMusicPosition, updateListMusics } from '@/core/list'
-import { playList, playListById, playNext } from '@/core/player/player'
+import { playListById, playNext } from '@/core/player/player'
+import { replaceQueueWithList } from '@/core/player/queue'
 import { addTempPlayList } from '@/core/player/tempPlayList'
 import settingState from '@/store/setting/state'
 import { similar, sortInsert, toOldMusicInfo } from '@/utils'
@@ -14,7 +15,8 @@ import { getListMusicSync } from '@/utils/listManage'
 import { clearMusicUrlByMusic } from '@/utils/data'
 
 export const handlePlay = (listId: SelectInfo['listId'], index: SelectInfo['index']) => {
-  void playList(listId, index)
+  // 复制到临时列表再播：队列里增删歌曲不会影响这个歌单
+  void replaceQueueWithList(listId, index)
 }
 export const handlePlayLater = (listId: SelectInfo['listId'], musicInfo: SelectInfo['musicInfo'], selectedList: SelectInfo['selectedList'], onCancelSelect: () => void) => {
   if (selectedList.length) {
